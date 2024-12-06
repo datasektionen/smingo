@@ -65,7 +65,7 @@ button.checked {
 app.get("/callback/:code", async (c: Context) => {
   const code = c.req.param("code");
   const resp = await fetch(
-    `https://logout.datasektionen.se/legacyapi/verify/${
+    `https://sso.datasektionen.se/legacyapi/verify/${
       encodeURIComponent(code)
     }?api_key=${loginApiKey}`,
   );
@@ -175,7 +175,7 @@ app.get("/", async (c: Context) => {
   const kthid = await getSignedCookie(c, cookieSecret, "kthid");
   if (!kthid) {
     return c.redirect(
-      "https://logout.datasektionen.se/legacyapi/login?callback=" +
+      "https://sso.datasektionen.se/legacyapi/login?callback=" +
         encodeURIComponent("https://smingo.datasektionen.se/callback/"),
     );
   }
