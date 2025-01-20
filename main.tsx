@@ -191,6 +191,7 @@ app.get("/", async (c: Context) => {
     const [bungus] = things.splice(Math.floor(rand() * things.length), 1);
     stuff.push(bungus);
   }
+  const localStorageIdent = Math.floor(rand() * 10000);
 
   return c.html(
     <Layout>
@@ -199,8 +200,8 @@ app.get("/", async (c: Context) => {
         {stuff.map((thing, i) => (
           <button
             _={`
-            on click toggle .checked on me then set localStorage.clicked${i} to me matches .checked end
-            on load if localStorage.clicked${i} == "true" then add .checked to me end
+            on click toggle .checked on me then set localStorage.clicked${localStorageIdent}_${i} to me matches .checked end
+            on load if localStorage.clicked${localStorageIdent}_${i} == "true" then add .checked to me end
           `}
           >
             {thing}
