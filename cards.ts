@@ -81,7 +81,7 @@ export default [
   `Valkandidat dyker inte upp på SM`,
   `Valkandidater har gått iväg`,
   `"Vi behöver inte prata om motionen då alla läst handlingarna"`,
-  `"Vill Någon vill lyfta originalmotionen eller någon alternativ kombination av ändringsyrkanden"`,
+  `"Någon vill lyfta originalmotionen eller någon alternativ kombination av ändringsyrkanden"`,
   `Elektroniskt röstningssystem strular`,
   `Röstsystem strular`,
   `Wikipediasidan för Schulze visas på skärmen`,
