@@ -1,9 +1,11 @@
 import { Context, Hono } from "hono";
 import { FC } from "hono/jsx";
 import { getSignedCookie, setSignedCookie } from "hono/cookie";
+import cards from "./cards.ts";
 
 const cookieSecret = Deno.env.get("COOKIE_SECRET");
 const loginApiKey = Deno.env.get("LOGIN_API_KEY");
+const websiteUrl = Deno.env.get("WEBSITE_URL");
 
 if (!cookieSecret || !loginApiKey) {
   console.error("COOKIE_SECRET or LOGIN_API_KEY missing in environment");
@@ -28,8 +30,14 @@ const Layout: FC = (props) => (
       <script src="https://unpkg.com/hyperscript.org@0.9.13"></script>
       <style>
         {`
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 body {
-  min-height: calc(100vh - 2ch);
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -53,11 +61,15 @@ button.checked {
   background-color: seagreen;
   color: white;
 }
+footer {
+  padding-block: 20px;
+}
       `}
       </style>
     </head>
     <body>
       {props.children}
+      <footer>{Math.random() < 0.1 ? "SMIIIIINGOOO!" : ""}</footer>
     </body>
   </html>
 );
@@ -75,104 +87,13 @@ app.get("/callback/:code", async (c: Context) => {
 });
 
 app.get("/", async (c: Context) => {
-  const things = [
-    `Ändring i föredragningslistan`,
-    `Årsmötet vill bryta mot stadgarna`,
-    `Årsredovisningen ej färdig`,
-    `Beslutsträd`,
-    `"Den svenska lagstiftningen för föreningar säger"`,
-    `Det är fler än 2 ändringsyrkande på samma motion/proposition`,
-    `Det saknas kandidater, vakantställning`,
-    `Det sker en sakupplysning`,
-    `Det var bättre förr`,
-    `Diskussion på samma punkt över en timme`,
-    `Diskussion som "fråga"`,
-    `En motion/propp ingen förstår`,
-    `En motion/propp är klar på under 3 minuter`,
-    `En motion/propp tar mer än 30 minuter`,
-    `En nämnd kuppar SM`,
-    `Fler än 5 personer vinner Betting`,
-    `Folk blir påminda att fokusera på valkandidaternas positiva sidor`,
-    `Folk utan rösträtt röstar`,
-    `Folk utan yrkanderätt yrkar`,
-    `För få eluttag`,
-    `"Hej SM!"`,
-    `Ingen revisor är på plats`,
-    `Ingen säger något på diskussion, bara tummar upp`,
-    `Ingen vet vilket ändringsyrkande som gäller`,
-    `Justerarna lämnar innan mötets slut`,
-    `Kandidat/motionär presenterar i max 10 sekunder`,
-    `"Kan du upprepa frågan?"`,
-    `"Kan vi hålla frågorna/diskussionen relevanta"`,
-    `Mikrofonerna strular`,
-    `Mötesordförande börjar argumentera för en ståndpunkt i sakfråga`,
-    `Mötesordförande citerar mötesordningen fel`,
-    `Mötesordförande glömmer vilken punkt mötet är på`,
-    `Mötesordförande läser upp fel att-sats`,
-    `Mötesordförande mumlar i rask takt`,
-    `Mötesordförande suckar högljutt åt någons förslag`,
-    `Motion avslås`,
-    `Motionssvar saknas`,
-    `Någon anser betting vara riggat`,
-    `Någon däremot? "Nej"`,
-    `Någon (Douglas) berättar sektionshistoria`,
-    `Någon drar över talartiden och vägrar sluta prata`,
-    `Någon hoppar/klättrar över en bänkrad`,
-    `Någon i styrelsen tar av sig hatten`,
-    `Någon jämkar sig`,
-    `Någon kallas rättshaverist`,
-    `Någon klagar på betting inte öppnats`,
-    `Någon (Olof) visar brain-rott på stora skärmen`,
-    `Någon öppnar dörren när den ska vara stängd`,
-    `Någon säger något halv-kul (minst 20% behöver skratta)`,
-    `Någon säger något jättekul (minst 80% behöver skratta)`,
-    `Någons telefon låter under beslut`,
-    `Någon tar mer än 10 sekunder på sig för att få mikrofonen att funka`,
-    `Någon tar upp en stadgeändring som övrig fråga`,
-    `Något annat än en ordförandeklubba agerar ordförandeklubba`,
-    `Något kallas odemokratiskt`,
-    `Okynnesvotering`,
-    `Ordningsfråga i ordningsfråga`,
-    `Ordningsfråga om beslutsordningen`,
-    `Ordvits ingen skrattar åt`,
-    `"På min tid"`,
-    `Personval i rösträknar och/eller justerarval`,
-    `Rösträknarna glömmer att meddela resultat av sluten omröstning`,
-    `Rummet är en kvav öken`,
-    `Sekreterare frågar om någons namn`,
-    `Skämt om medias ekonomi`,
-    `"Sluta stäng av mikrofonen"`,
-    `SM behöver dag 2`,
-    `SM börjar minst 15 min sent`,
-    `"SMingo!"`,
-    `SM tar mer än 3 timmar`,
-    `Stadgarna säger emot sig själva`,
-    `Sträck i debatten`,
-    `Streck i debatten-debatt > 15 min`,
-    `Styrelsen har smugit in en oseriös att-sats`,
-    `Styrelsen hävdar praxis`,
-    `Talarlistan används`,
-    `Talman avbryter någon mitt i meningen`,
-    `Talman talar fel`,
-    `Talman tappar förmågan att tala`,
-    `Teknikstrul följt av livlig diskussion om lösning`,
-    `"Tjing"`,
-    `Valkandidat dyker inte upp på SM`,
-    `Valkandidater har gått iväg`,
-    `"Vi behöver inte prata om motionen då alla läst handlingarna"`,
-    `"Vill Någon vill lyfta originalmotionen eller någon alternativ kombination av ändringsyrkanden"`,
-    `Elektroniskt röstningssystem strular`,
-    `WiFi strular`,
-    `Wikipediasidan för Schulze visas på skärmen`,
-    `Yrkning efter bilaga`,
-  ];
-  things.sort();
+  const things = cards.toSorted();
 
   const kthid = await getSignedCookie(c, cookieSecret, "kthid");
   if (!kthid) {
     return c.redirect(
       "https://sso.datasektionen.se/legacyapi/login?callback=" +
-        encodeURIComponent("https://smingo.datasektionen.se/callback/"),
+        encodeURIComponent(websiteUrl + "/callback/"),
     );
   }
 
