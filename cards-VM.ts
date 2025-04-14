@@ -61,4 +61,3 @@ export default [
     `Elektroniskt röstningssystem strular`,
     `Wikipediasidan för Schulze visas på skärmen`,
   ];
-  
