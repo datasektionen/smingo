@@ -1,7 +1,7 @@
 import { Context, Hono } from "hono";
 import { FC } from "hono/jsx";
 import { getSignedCookie, setSignedCookie } from "hono/cookie";
-import cards from "./cards.ts";
+import cards from "./cards-VM.ts";
 
 const cookieSecret = Deno.env.get("COOKIE_SECRET");
 const loginApiKey = Deno.env.get("LOGIN_API_KEY");
@@ -116,7 +116,7 @@ app.get("/", async (c: Context) => {
 
   return c.html(
     <Layout>
-      <h1>SMingo</h1>
+      <h1>VMingo</h1>
       <main>
         {stuff.map((thing, i) => (
           <button
