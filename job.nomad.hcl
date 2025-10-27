@@ -32,6 +32,7 @@ COOKIE_SECRET={{ .cookie_secret }}
 LOGIN_API_KEY={{ .login_api_key }}
 {{ end }}
 PORT={{ env "NOMAD_PORT_http" }}
+WEBSITE_URL=https://smingo.datasektionen.se
 ENV
         destination = "local/.env"
         env         = true

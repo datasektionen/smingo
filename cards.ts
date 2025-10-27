@@ -25,7 +25,7 @@ export default [
   `Talman citerar mötesordningen fel`,
   `Talman glömmer vilken punkt mötet är på`,
   `Talman läser upp fel att-sats`,
-  `Talman mumlar i rask takt`,
+  `Talman mumlar`,
   `Talman suckar högljutt åt någons förslag`,
   `Motion avslås`,
   `Motionssvar saknas`,
