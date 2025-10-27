@@ -1,7 +1,7 @@
 import { Context, Hono } from "hono";
 import { FC } from "hono/jsx";
 import { getSignedCookie, setSignedCookie } from "hono/cookie";
-import cards from "./cards-VM.ts";
+import cards from "./cards.ts";
 
 const cookieSecret = Deno.env.get("COOKIE_SECRET");
 const loginApiKey = Deno.env.get("LOGIN_API_KEY");
