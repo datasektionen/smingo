@@ -60,4 +60,4 @@ export default [
     `"Ni har ju alla läst valhandlingarna men ..."`,
     `Elektroniskt röstningssystem strular`,
     `Wikipediasidan för Schulze visas på skärmen`,
-];
+  ];
