@@ -1,4 +1,4 @@
-FROM docker.io/denoland/deno:alpine-2.1.2
+FROM docker.io/denoland/deno:alpine-2.3.7
 
 WORKDIR /app
 
