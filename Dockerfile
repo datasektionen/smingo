@@ -2,9 +2,12 @@ FROM docker.io/denoland/deno:alpine-2.3.7
 
 WORKDIR /app
 
-COPY deno.json deno.lock cards.ts cards-VM.ts ./
-RUN deno install
+COPY deno.json deno.lock ./
 
-COPY main.tsx ./
+COPY main.tsx cards.ts cards-VM.ts ./
+COPY components ./components
+COPY public ./public
+
+RUN deno cache main.tsx
 
 CMD ["deno", "task", "start"]

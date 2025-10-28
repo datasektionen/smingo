@@ -33,6 +33,7 @@ LOGIN_API_KEY={{ .login_api_key }}
 {{ end }}
 PORT={{ env "NOMAD_PORT_http" }}
 WEBSITE_URL=https://smingo.datasektionen.se
+ADMIN_KTHIDS=liamt,mathm,kalindbl,viktoe
 ENV
         destination = "local/.env"
         env         = true
