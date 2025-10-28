@@ -71,4 +71,5 @@ export default [
   `Wikipediasidan för Schulze visas på skärmen`,
   `Mer än en kandidat i ett val`,
   `"De här borde lösas bättre till nästa år"`,
+  `"[X] var dåligt förra året. Planerar du att göra det bättre?"`,
 ];
