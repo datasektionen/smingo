@@ -350,8 +350,8 @@ button.cell {
   position: absolute;
   top: 6px;
   right: 6px;
-  width: 6px;
-  height: 6px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: #16a34a;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);

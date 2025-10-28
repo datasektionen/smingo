@@ -99,8 +99,8 @@ const HomePage: FC<HomePageProps> = ({
   const ownKthId = config.userProfile && typeof config.userProfile.kthId === "string"
     ? config.userProfile.kthId
     : config.userId;
-  const PEER_TOOLTIP_PREFIX_SELF = "Also selected by:";
-  const PEER_TOOLTIP_PREFIX_OTHERS = "Selected by:";
+  const PEER_TOOLTIP_PREFIX_SELF = "Också vald av:";
+  const PEER_TOOLTIP_PREFIX_OTHERS = "Vald av:";
   const HIGHLIGHT_SPEED = 220; // pixels per second
   const HIGHLIGHT_GAP = 24; // px gap between messages
   const HIGHLIGHT_MIN_DURATION = 4; // seconds

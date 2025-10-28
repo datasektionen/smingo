@@ -392,7 +392,7 @@ function setupPlayerSocket(ws: WebSocket) {
         const bingoNumber = session.bingoCount;
         const chatPayload: ChatRecord = {
           type: "chat",
-          userId: session.userId,
+          userId: "",
           message: `${session.userId} got bingo #${bingoNumber}!`,
           timestamp: Date.now(),
           categories: ["bingo"],
