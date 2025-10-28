@@ -80,6 +80,17 @@ const playerSessions = new Map<string, PlayerSession>();
 const adminSockets = new Set<WebSocket>();
 const playerSockets = new Map<string, WebSocket>();
 let playerCounter = 0;
+const RECENT_CHAT_LIMIT = 50;
+
+interface ChatRecord {
+  type: "chat";
+  userId: string;
+  message: string;
+  timestamp: number;
+  categories: string[];
+}
+
+const recentChatMessages: ChatRecord[] = [];
 
 function normalizeClicked(value: unknown, boardSize: number): number[] {
   if (!Array.isArray(value) || boardSize <= 0) return [];
@@ -207,6 +218,73 @@ function broadcastToPlayers(payload: string) {
   }
 }
 
+function broadcastChatMessage(message: ChatRecord) {
+  recentChatMessages.push(message);
+  if (recentChatMessages.length > RECENT_CHAT_LIMIT) {
+    recentChatMessages.splice(0, recentChatMessages.length - RECENT_CHAT_LIMIT);
+  }
+  broadcastToPlayers(JSON.stringify(message));
+}
+
+function createPeerSelectionMap() {
+  const map = new Map<string, Map<string, string>>();
+  for (const session of playerSessions.values()) {
+    if (!Array.isArray(session.board) || session.board.length === 0) continue;
+    if (!Array.isArray(session.clicked) || session.clicked.length === 0) continue;
+    const clickedSet = new Set(session.clicked);
+    for (const idx of clickedSet) {
+      if (idx < 0 || idx >= session.board.length) continue;
+      const cellValue = session.board[idx];
+      if (typeof cellValue !== "string" || cellValue.length === 0) continue;
+      let entry = map.get(cellValue);
+      if (!entry) {
+        entry = new Map();
+        map.set(cellValue, entry);
+      }
+      entry.set(session.kthId, session.userId);
+    }
+  }
+  return map;
+}
+
+function broadcastPeerSelections() {
+  if (playerSockets.size === 0) return;
+  const selectionMap = createPeerSelectionMap();
+  const selections: Record<string, { kthId: string; displayName: string }[]> = {};
+  for (const [cell, players] of selectionMap.entries()) {
+    selections[cell] = Array.from(players.entries()).map(([kthId, displayName]) => ({
+      kthId,
+      displayName,
+    }));
+  }
+  const payload = JSON.stringify({
+    type: "peerSelections",
+    selections,
+  });
+  broadcastToPlayers(payload);
+}
+
+function sendChatHistory(target: WebSocket) {
+  if (recentChatMessages.length === 0) return;
+  const payload = JSON.stringify({
+    type: "chatHistory",
+    messages: recentChatMessages,
+  });
+  if (target.readyState === WebSocket.OPEN) {
+    target.send(payload);
+  } else if (target.readyState === WebSocket.CONNECTING) {
+    target.addEventListener(
+      "open",
+      () => {
+        if (target.readyState === WebSocket.OPEN) {
+          target.send(payload);
+        }
+      },
+      { once: true },
+    );
+  }
+}
+
 function setupAdminSocket(ws: WebSocket) {
   adminSockets.add(ws);
   const cleanup = () => {
@@ -228,6 +306,7 @@ function setupPlayerSocket(ws: WebSocket) {
       playerSessions.delete(connectionId);
       session = undefined;
       broadcastAdminState();
+      broadcastPeerSelections();
     }
     playerSockets.delete(connectionId);
   };
@@ -284,6 +363,8 @@ function setupPlayerSocket(ws: WebSocket) {
       }
 
       broadcastAdminState();
+      broadcastPeerSelections();
+      sendChatHistory(ws);
     } else if (type === "state") {
       if (!session) return;
       const previousBingoCount = session.bingoCount;
@@ -294,6 +375,7 @@ function setupPlayerSocket(ws: WebSocket) {
       session.lastUpdate = Date.now();
       session.bingoCount = computeBingoCount(session.board.length, session.clicked);
       broadcastAdminState();
+      broadcastPeerSelections();
       if (newCells.length > 0) {
         for (const idx of newCells) {
           const cellValue = session.board[idx] ?? `Cell ${idx + 1}`;
@@ -308,14 +390,14 @@ function setupPlayerSocket(ws: WebSocket) {
       }
       if (session.bingoCount > previousBingoCount) {
         const bingoNumber = session.bingoCount;
-        const chatPayload = JSON.stringify({
+        const chatPayload: ChatRecord = {
           type: "chat",
-          userId: "",
+          userId: session.userId,
           message: `${session.userId} got bingo #${bingoNumber}!`,
           timestamp: Date.now(),
           categories: ["bingo"],
-        });
-        broadcastToPlayers(chatPayload);
+        };
+        broadcastChatMessage(chatPayload);
       }
     } else if (type === "chat") {
       if (!session) return;
@@ -326,14 +408,14 @@ function setupPlayerSocket(ws: WebSocket) {
         .trim()
         .slice(0, 300);
       if (!message) return;
-      const chatPayload = JSON.stringify({
+      const chatPayload: ChatRecord = {
         type: "chat",
         userId: session.userId,
         message,
         timestamp: Date.now(),
         categories: [],
-      });
-      broadcastToPlayers(chatPayload);
+      };
+      broadcastChatMessage(chatPayload);
     }
   });
 }

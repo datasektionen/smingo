@@ -201,6 +201,7 @@ main.board-grid {
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 10px;
   padding: 8px 10px;
+  margin-left: 4px;
   background: rgba(248, 250, 252, 0.85);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -255,6 +256,21 @@ main.board-grid {
 .chat-message__body--bingo {
   font-weight: 600;
   color: #8b2500;
+}
+
+.chat-mention {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.chat-message--ping {
+  box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.45),
+    0 0 18px rgba(255, 140, 0, 0.35);
+}
+
+.chat-message--bingo.chat-message--ping {
+  box-shadow: 0 6px 20px rgba(255, 140, 0, 0.3),
+    0 0 0 2px rgba(255, 165, 0, 0.45), 0 0 18px rgba(255, 140, 0, 0.35);
 }
 
 .chat-form {
@@ -324,6 +340,22 @@ button.checked {
   background: seagreen;
   color: white;
   box-shadow: 0 4px 20px rgba(46, 139, 87, 0.45);
+}
+
+button.cell {
+  position: relative;
+}
+
+.cell-peer-indicator {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #16a34a;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
+  pointer-events: none;
 }
 
 footer {

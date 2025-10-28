@@ -95,9 +95,86 @@ const HomePage: FC<HomePageProps> = ({
   const MAX_CHAT_MESSAGES = 50;
   const highlightBanner = document.getElementById("highlightBanner");
   const highlightAnimations = new Set();
+  const peerSelections = new Map();
+  const ownKthId = config.userProfile && typeof config.userProfile.kthId === "string"
+    ? config.userProfile.kthId
+    : config.userId;
+  const PEER_TOOLTIP_PREFIX_SELF = "Also selected by:";
+  const PEER_TOOLTIP_PREFIX_OTHERS = "Selected by:";
   const HIGHLIGHT_SPEED = 220; // pixels per second
   const HIGHLIGHT_GAP = 24; // px gap between messages
   const HIGHLIGHT_MIN_DURATION = 4; // seconds
+  const mentionTargets = (() => {
+    const targetSet = new Set();
+    const normalize = (value) =>
+      typeof value === "string"
+        ? value
+            .toLowerCase()
+            .normalize("NFKD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]/g, "")
+        : "";
+    const push = (value) => {
+      const normalized = normalize(value);
+      if (normalized) targetSet.add(normalized);
+    };
+    if (config.userProfile) {
+      const first = config.userProfile.firstName ?? "";
+      const family = config.userProfile.familyName ?? "";
+      push(first + family);
+      if (first && family) push(first + " " + family);
+      push(config.userProfile.kthId);
+    }
+    push(config.userDisplayName);
+    push(config.userId);
+    return { set: targetSet, normalize };
+  })();
+
+  function updatePeerIndicators() {
+    const buttons = document.querySelectorAll("main.board-grid button.cell");
+    if (!Array.isArray(config.cells) || config.cells.length === 0 || buttons.length === 0) {
+      return;
+    }
+    buttons.forEach((rawBtn, idx) => {
+      const btn = rawBtn instanceof HTMLElement ? rawBtn : null;
+      if (!btn) return;
+      const cellValue = config.cells[idx];
+      if (typeof cellValue !== "string") return;
+      const participants = peerSelections.get(cellValue) || [];
+      const selfSelected = btn.classList.contains("checked");
+      const otherPlayers = participants.filter((entry) => entry && entry.kthId !== ownKthId);
+      const shouldShow = (selfSelected && otherPlayers.length > 0) || (!selfSelected && participants.length > 0);
+      let indicator = btn.querySelector(".cell-peer-indicator");
+      if (shouldShow) {
+        if (!indicator) {
+          indicator = document.createElement("span");
+          indicator.className = "cell-peer-indicator";
+          indicator.setAttribute("aria-hidden", "true");
+          btn.appendChild(indicator);
+        }
+        const namesSource = selfSelected ? otherPlayers : participants;
+        const tooltipNames = namesSource
+          .map((entry) => (entry && typeof entry.displayName === "string" ? entry.displayName : ""))
+          .filter(Boolean);
+        if (tooltipNames.length > 0) {
+          const prefix = selfSelected ? PEER_TOOLTIP_PREFIX_SELF : PEER_TOOLTIP_PREFIX_OTHERS;
+          const tooltip = tooltipNames.length === 1
+            ? prefix + " " + tooltipNames[0]
+            : prefix + "\\n" + tooltipNames.join("\\n");
+          btn.setAttribute("title", tooltip);
+          btn.dataset.peerTooltip = "1";
+        }
+      } else {
+        if (indicator) {
+          indicator.remove();
+        }
+        if (btn.dataset.peerTooltip === "1") {
+          btn.removeAttribute("title");
+          delete btn.dataset.peerTooltip;
+        }
+      }
+    });
+  }
 
   function getHighlightTail(now) {
     if (!highlightBanner) return window.innerWidth;
@@ -137,6 +214,31 @@ const HomePage: FC<HomePageProps> = ({
     return result;
   }
 
+  function formatChatMessageText(message) {
+    const fragment = document.createDocumentFragment();
+    let hasSelfPing = false;
+    const parts = message.match(/\\S+|\\s/g);
+
+    for (const part of parts) {
+      if (!part) continue;
+      if (part.startsWith("@")) {
+        const span = document.createElement("span");
+        span.className = "chat-mention";
+        span.textContent = part;
+        fragment.append(span);
+
+        const normalized = mentionTargets.normalize(part.slice(1));
+        if (mentionTargets.set.has(normalized)) {
+          hasSelfPing = true;
+        }
+      } else {
+        fragment.append(document.createTextNode(part));
+      }
+    }
+
+    return { fragment, hasSelfPing };
+  }
+
   function send(message) {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       return false;
@@ -174,6 +276,7 @@ const HomePage: FC<HomePageProps> = ({
     const snapshot = readFromDom();
     latestClicked = snapshot;
     sendStateSnapshot(snapshot);
+    updatePeerIndicators();
   }
 
   function enqueueHighlight(event) {
@@ -283,12 +386,16 @@ const HomePage: FC<HomePageProps> = ({
 
     const body = document.createElement("p");
     body.className = categories.has("bingo") ? "chat-message__body chat-message__body--bingo" : "chat-message__body";
-    body.textContent = entry.message;
+    const formattedMessage = formatChatMessageText(entry.message);
+    body.appendChild(formattedMessage.fragment);
 
     wrapper.appendChild(header);
     wrapper.appendChild(body);
     chatMessages.appendChild(wrapper);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (formattedMessage.hasSelfPing) {
+      wrapper.classList.add("chat-message--ping");
+    }
   }
 
   function handleChatSubmit(event) {
@@ -323,10 +430,46 @@ const HomePage: FC<HomePageProps> = ({
       return;
     }
     if (!payload || typeof payload !== "object") return;
-    if (payload.type === "chat") {
+    if (payload.type === "chatHistory") {
+      const messages = Array.isArray(payload.messages) ? payload.messages : [];
+      if (chatMessages) {
+        chatMessages.innerHTML = "";
+      }
+      chatHistory.length = 0;
+      if (messages.length === 0) {
+        if (chatMessages && chatPlaceholder) {
+          chatMessages.appendChild(chatPlaceholder);
+        }
+        return;
+      }
+      messages.forEach((message) => addChatMessage(message));
+    } else if (payload.type === "chat") {
       addChatMessage(payload);
     } else if (payload.type === "highlight") {
       enqueueHighlight(payload);
+    } else if (payload.type === "peerSelections") {
+      peerSelections.clear();
+      const selections = payload.selections;
+      if (selections && typeof selections === "object") {
+        Object.entries(selections).forEach(([cell, value]) => {
+          if (typeof cell !== "string" || !Array.isArray(value)) return;
+          if (!Array.isArray(config.cells) || config.cells.indexOf(cell) === -1) return;
+          const seen = new Set();
+          const normalized = [];
+          value.forEach((entry) => {
+            if (!entry || typeof entry !== "object") return;
+            const kthId = typeof entry.kthId === "string" ? entry.kthId : "";
+            const displayName = typeof entry.displayName === "string" ? entry.displayName : "";
+            if (!kthId || !displayName || seen.has(kthId)) return;
+            seen.add(kthId);
+            normalized.push({ kthId, displayName });
+          });
+          if (normalized.length > 0) {
+            peerSelections.set(cell, normalized);
+          }
+        });
+      }
+      updatePeerIndicators();
     }
   }
 
