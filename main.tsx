@@ -68,6 +68,7 @@ const app = new Hono();
 interface PlayerSession {
   id: string;
   userId: string;
+  kthId: string;
   board: string[];
   clicked: number[];
   connectedAt: number;
@@ -97,6 +98,7 @@ function serializePlayers() {
     .map((session) => ({
       id: session.id,
       userId: session.userId,
+      kthId: session.kthId,
       board: session.board,
       clicked: session.clicked,
       connectedAt: session.connectedAt,
@@ -251,16 +253,20 @@ function setupPlayerSocket(ws: WebSocket) {
         ? data.board.filter((item): item is string => typeof item === "string").slice(0, 25)
         : undefined;
       const clicked = normalizeClicked(data.clicked, board?.length ?? 0);
-      const userId = typeof data.userId === "string" && data.userId.length > 0
+      const kthId = typeof data.userId === "string" && data.userId.length > 0
         ? data.userId
         : "unknown";
+      const displayName = typeof data.displayName === "string" && data.displayName.length > 0
+        ? data.displayName
+        : kthId;
 
       if (!board || board.length === 0) return;
 
       if (!session) {
         session = {
           id: connectionId,
-          userId,
+          userId: displayName,
+          kthId,
           board,
           clicked,
           connectedAt: Date.now(),
@@ -269,7 +275,8 @@ function setupPlayerSocket(ws: WebSocket) {
         };
         playerSessions.set(connectionId, session);
       } else {
-        session.userId = userId;
+        session.userId = displayName;
+        session.kthId = kthId;
         session.board = board;
         session.clicked = clicked;
         session.lastUpdate = Date.now();
@@ -303,7 +310,7 @@ function setupPlayerSocket(ws: WebSocket) {
         const bingoNumber = session.bingoCount;
         const chatPayload = JSON.stringify({
           type: "chat",
-          userId: session.userId,
+          userId: "",
           message: `${session.userId} got bingo #${bingoNumber}!`,
           timestamp: Date.now(),
           categories: ["bingo"],
@@ -387,10 +394,58 @@ app.get("/", async (c: Context) => {
     kthid = cookieValue;
   }
 
-  const userId = kthid!;
+  const userKthId = kthid!;
+  const userProfile = {
+    kthId: userKthId,
+    email: "",
+    firstName: "",
+    familyName: "",
+    yearTag: "",
+  };
+
+  if (DEV_MODE) {
+    userProfile.email = "dev@example.com";
+    userProfile.firstName = "User";
+    userProfile.familyName = userKthId;
+    userProfile.yearTag = "D00";
+  } else {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const directoryUrl =
+        "http://sso.nomad.dsekt.internal/api/users?format=single&u=" + encodeURIComponent(userKthId);
+      const response = await fetch(directoryUrl, { signal: controller.signal });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && typeof data === "object") {
+          userProfile.email = typeof data.email === "string" ? data.email.trim() : "";
+          userProfile.firstName = typeof data.firstName === "string" ? data.firstName.trim() : "";
+          userProfile.familyName = typeof data.familyName === "string" ? data.familyName.trim() : "";
+          userProfile.yearTag = typeof data.yearTag === "string" ? data.yearTag.trim() : "";
+        }
+      } else {
+        console.warn("Failed to fetch user profile for", userKthId, response.status, response.statusText);
+      }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        console.warn("Directory lookup failed for", userKthId, error);
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  const baseName = [userProfile.firstName, userProfile.familyName]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+  const nameWithoutYear = baseName || userKthId;
+  const userDisplayName = userProfile.yearTag
+    ? `${nameWithoutYear} (${userProfile.yearTag})`
+    : nameWithoutYear;
   const stuff: string[] = [];
   let seed = 0;
-  for (const ch of userId) seed = seed * 256 + ch.charCodeAt(0);
+  for (const ch of userKthId) seed = seed * 256 + ch.charCodeAt(0);
   for (const ch of new Date().toDateString()) seed = seed * 256 + ch.charCodeAt(0);
 
   const rand = random(seed);
@@ -406,7 +461,9 @@ app.get("/", async (c: Context) => {
         title={`SMingo ${DEV_MODE ? "(DEV)" : ""}`}
         cells={stuff}
         localStorageIdent={localStorageIdent}
-        userId={userId}
+        userId={userKthId}
+        userDisplayName={userDisplayName}
+        userProfile={userProfile}
       />
     </Layout>,
   );

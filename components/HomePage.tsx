@@ -1,15 +1,38 @@
 import type { FC } from "hono/jsx";
 import ChatPanel from "./ChatPanel.tsx";
 
+interface UserProfile {
+  kthId: string;
+  email: string;
+  firstName: string;
+  familyName: string;
+  yearTag: string;
+}
+
 interface HomePageProps {
   title: string;
   cells: readonly string[];
   localStorageIdent: number;
   userId: string;
+  userDisplayName: string;
+  userProfile: UserProfile;
 }
 
-const HomePage: FC<HomePageProps> = ({ title, cells, localStorageIdent, userId }) => {
-  const configJson = JSON.stringify({ userId, localStorageIdent, cells });
+const HomePage: FC<HomePageProps> = ({
+  title,
+  cells,
+  localStorageIdent,
+  userId,
+  userDisplayName,
+  userProfile,
+}) => {
+  const configJson = JSON.stringify({
+    userId,
+    userDisplayName,
+    localStorageIdent,
+    cells,
+    userProfile,
+  });
 
   return (
     <div class="home-content">
@@ -22,12 +45,12 @@ const HomePage: FC<HomePageProps> = ({ title, cells, localStorageIdent, userId }
       <header class="home-header">
         <div class="player-meta">
           <span>
-            Logged in as <strong>{userId}</strong>
+            Logged in as <strong>{userDisplayName}</strong>
           </span>
         </div>
       </header>
       <div class="home-columns">
-        <ChatPanel userId={userId} />
+        <ChatPanel userId={userDisplayName} />
         <main class="board-column board-grid">
           {cells.map((thing, i) => (
             <button
@@ -72,7 +95,7 @@ const HomePage: FC<HomePageProps> = ({ title, cells, localStorageIdent, userId }
   const MAX_CHAT_MESSAGES = 50;
   const highlightBanner = document.getElementById("highlightBanner");
   const highlightAnimations = new Set();
-  const HIGHLIGHT_SPEED = 180; // pixels per second
+  const HIGHLIGHT_SPEED = 220; // pixels per second
   const HIGHLIGHT_GAP = 24; // px gap between messages
   const HIGHLIGHT_MIN_DURATION = 4; // seconds
 
@@ -130,6 +153,7 @@ const HomePage: FC<HomePageProps> = ({ title, cells, localStorageIdent, userId }
     send({
       type: "hello",
       userId: config.userId,
+      displayName: config.userDisplayName,
       board: config.cells,
       clicked: latestClicked,
     });
