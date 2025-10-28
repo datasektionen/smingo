@@ -46,7 +46,6 @@ export default [
   `Ordningsfråga`,
   `Ordvits ingen skrattar åt`,
   `"På min tid"`,
-  `Personval i rösträknar och/eller justerarval`,
   `Rösträknarna glömmer att meddela resultat av sluten omröstning`,
   `Rummet är en kvav öken`,
   `Sekreterare frågar om någons namn`,
