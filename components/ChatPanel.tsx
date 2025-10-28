@@ -7,14 +7,12 @@ interface ChatPanelProps {
 const ChatPanel: FC<ChatPanelProps> = ({ userId }) => (
   <aside class="chat-panel" aria-label="Live chat">
     <header class="chat-header">
-      <h2>Chatt</h2>
-      <p class="chat-subtitle">Du chattar som <strong>{userId}</strong></p>
+      <h1>SMingo</h1>
     </header>
     <div id="chatMessages" class="chat-messages" aria-live="polite" aria-relevant="additions">
       <p class="chat-placeholder">Hej världen!</p>
     </div>
     <form id="chatForm" class="chat-form" autocomplete="off">
-      <label for="chatInput" class="chat-label">Meddelande</label>
       <div class="chat-input-row">
         <input
           id="chatInput"
