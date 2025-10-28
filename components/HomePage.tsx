@@ -94,16 +94,19 @@ const HomePage: FC<HomePageProps> = ({
   const chatHistory = [];
   const MAX_CHAT_MESSAGES = 50;
   const highlightBanner = document.getElementById("highlightBanner");
-  const highlightAnimations = new Set();
+  const highlightItems = new Set();
+  let highlightFrame = null;
+  let highlightLastTick = null;
   const peerSelections = new Map();
   const ownKthId = config.userProfile && typeof config.userProfile.kthId === "string"
     ? config.userProfile.kthId
     : config.userId;
   const PEER_TOOLTIP_PREFIX_SELF = "Också vald av:";
   const PEER_TOOLTIP_PREFIX_OTHERS = "Vald av:";
-  const HIGHLIGHT_SPEED = 220; // pixels per second
+  const HIGHLIGHT_MIN_SPEED = 160; // pixels per second when queue is empty
+  const HIGHLIGHT_MAX_SPEED = 1000; // pixels per second at high backlog
+  const HIGHLIGHT_SPEED_THRESHOLD = 10; // backlog size to reach max speed
   const HIGHLIGHT_GAP = 24; // px gap between messages
-  const HIGHLIGHT_MIN_DURATION = 4; // seconds
   const mentionTargets = (() => {
     const targetSet = new Set();
     const normalize = (value) =>
@@ -129,6 +132,14 @@ const HomePage: FC<HomePageProps> = ({
     push(config.userId);
     return { set: targetSet, normalize };
   })();
+
+  function computeHighlightSpeed() {
+    const backlog = Math.max(highlightItems.size, 1);
+    if (backlog <= 1) return HIGHLIGHT_MIN_SPEED;
+    const capped = Math.min(backlog, HIGHLIGHT_SPEED_THRESHOLD);
+    const t = (capped - 1) / (HIGHLIGHT_SPEED_THRESHOLD - 1);
+    return HIGHLIGHT_MIN_SPEED + t * (HIGHLIGHT_MAX_SPEED - HIGHLIGHT_MIN_SPEED);
+  }
 
   function updatePeerIndicators() {
     const buttons = document.querySelectorAll("main.board-grid button.cell");
@@ -176,13 +187,79 @@ const HomePage: FC<HomePageProps> = ({
     });
   }
 
-  function getHighlightTail(now) {
+  function ensureHighlightLoop() {
+    if (highlightFrame !== null) return;
+    highlightFrame = requestAnimationFrame(stepHighlightAnimation);
+  }
+
+  function stopHighlightLoop() {
+    if (highlightFrame !== null) {
+      cancelAnimationFrame(highlightFrame);
+      highlightFrame = null;
+    }
+    highlightLastTick = null;
+  }
+
+  function stepHighlightAnimation(timestamp) {
+    if (highlightItems.size === 0) {
+      stopHighlightLoop();
+      if (highlightBanner) {
+        highlightBanner.classList.remove("is-visible");
+      }
+      return;
+    }
+
+    if (highlightLastTick === null) {
+      highlightLastTick = timestamp;
+    }
+    const delta = Math.max((timestamp - highlightLastTick) / 1000, 0);
+    highlightLastTick = timestamp;
+
+    const speed = computeHighlightSpeed();
+    const toRemove = [];
+
+    highlightItems.forEach((item) => {
+      item.elapsed += delta;
+      item.position -= speed * delta;
+      const distanceCovered = item.startX - item.position;
+      const progress = Math.min(Math.max(distanceCovered / item.travelDistance, 0), 1);
+      const fadeInThreshold = 0.08;
+      const fadeOutThreshold = 0.92;
+      let opacity = 1;
+      if (progress < fadeInThreshold) {
+        opacity = Math.min(1, progress / fadeInThreshold);
+      } else if (progress > fadeOutThreshold) {
+        opacity = Math.max(0, (1 - progress) / (1 - fadeOutThreshold));
+      }
+      item.el.style.opacity = opacity.toFixed(3);
+      item.el.style.transform = "translate3d(" + item.position + "px, -50%, 0)";
+
+      if (item.position <= -item.width - HIGHLIGHT_GAP) {
+        toRemove.push(item);
+      }
+    });
+
+    if (toRemove.length > 0) {
+      toRemove.forEach((item) => {
+        highlightItems.delete(item);
+        if (item.el.parentElement === highlightBanner) {
+          highlightBanner.removeChild(item.el);
+        }
+      });
+      if (highlightItems.size === 0 && highlightBanner) {
+        highlightBanner.classList.remove("is-visible");
+      }
+    }
+
+    highlightFrame = requestAnimationFrame(stepHighlightAnimation);
+  }
+
+  function getHighlightTail() {
     if (!highlightBanner) return window.innerWidth;
     const bannerWidth = highlightBanner.clientWidth || window.innerWidth;
     let tail = bannerWidth;
-    highlightAnimations.forEach((item) => {
-      const elapsed = (now - item.startTime) / 1000;
-      const currentRight = item.startX + item.width - elapsed * HIGHLIGHT_SPEED;
+    highlightItems.forEach((item) => {
+      const currentRight = item.position + item.width;
       if (currentRight > tail) {
         tail = currentRight;
       }
@@ -217,19 +294,28 @@ const HomePage: FC<HomePageProps> = ({
   function formatChatMessageText(message) {
     const fragment = document.createDocumentFragment();
     let hasSelfPing = false;
-    const parts = message.match(/\\S+|\\s/g);
+    const parts = message.match(/\\S+|\\s+/g) ?? [message];
 
     for (const part of parts) {
       if (!part) continue;
       if (part.startsWith("@")) {
+        const match = part.match(/^@\\S*/);
+        const mentionText = match ? match[0] : part;
+        const remainder = match ? part.slice(mentionText.length) : "";
+
         const span = document.createElement("span");
         span.className = "chat-mention";
-        span.textContent = part;
-        fragment.append(span);
+        span.textContent = mentionText;
 
-        const normalized = mentionTargets.normalize(part.slice(1));
+        const normalized = mentionTargets.normalize(mentionText.slice(1));
         if (mentionTargets.set.has(normalized)) {
+          span.dataset.mentionSelf = "1";
           hasSelfPing = true;
+        }
+
+        fragment.append(span);
+        if (remainder) {
+          fragment.append(document.createTextNode(remainder));
         }
       } else {
         fragment.append(document.createTextNode(part));
@@ -291,50 +377,26 @@ const HomePage: FC<HomePageProps> = ({
     highlightBanner.appendChild(messageEl);
 
     const messageWidth = messageEl.getBoundingClientRect().width || 0;
-    const now = performance.now();
     const bannerWidth = highlightBanner.clientWidth || window.innerWidth;
-    const startX = highlightAnimations.size > 0
-      ? Math.max(getHighlightTail(now) + HIGHLIGHT_GAP, bannerWidth)
-      : bannerWidth;
-    const travelDistance = startX + messageWidth;
-    const durationSeconds = Math.max(travelDistance / HIGHLIGHT_SPEED, HIGHLIGHT_MIN_DURATION);
+    const startTail = highlightItems.size > 0 ? Math.max(getHighlightTail() + HIGHLIGHT_GAP, bannerWidth) : bannerWidth;
+    const startX = startTail;
+    const travelDistance = Math.max(startX + messageWidth, 1);
 
     highlightBanner.classList.add("is-visible");
     messageEl.style.visibility = "";
     messageEl.style.transform = "translate3d(" + startX + "px, -50%, 0)";
+    messageEl.style.opacity = "0";
 
-    const animation = messageEl.animate(
-      [
-        { transform: "translate3d(" + startX + "px, -50%, 0)" },
-        { transform: "translate3d(" + -messageWidth + "px, -50%, 0)" },
-      ],
-      {
-        duration: durationSeconds * 1000,
-        easing: "linear",
-        fill: "forwards",
-      },
-    );
-
-    const animationRecord = {
+    const item = {
       el: messageEl,
-      startX,
       width: messageWidth,
-      startTime: now,
+      position: startX,
+      startX,
+      travelDistance,
+      elapsed: 0,
     };
-    highlightAnimations.add(animationRecord);
-
-    const cleanup = () => {
-      highlightAnimations.delete(animationRecord);
-      if (messageEl.parentElement === highlightBanner) {
-        highlightBanner.removeChild(messageEl);
-      }
-      if (highlightAnimations.size === 0) {
-        highlightBanner.classList.remove("is-visible");
-      }
-    };
-
-    animation.addEventListener("finish", cleanup);
-    animation.addEventListener("cancel", cleanup);
+    highlightItems.add(item);
+    ensureHighlightLoop();
   }
 
   function addChatMessage(event) {
