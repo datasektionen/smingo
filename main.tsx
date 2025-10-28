@@ -62,6 +62,7 @@ function random(seed: number) {
 
 const smingoCss = Deno.readTextFileSync(new URL("./public/smingo.css", import.meta.url));
 const smingoJs = Deno.readTextFileSync(new URL("./public/smingo.js", import.meta.url));
+const favicon = Deno.readFileSync(new URL("./public/favicon.png", import.meta.url));
 
 const app = new Hono();
 
@@ -316,6 +317,15 @@ app.get("/assets/smingo.js", () =>
   new Response(smingoJs, {
     headers: {
       "content-type": "text/javascript; charset=utf-8",
+      "cache-control": DEV_MODE ? "no-store" : "public, max-age=300",
+    },
+  }),
+);
+
+app.get("/assets/favicon.png", () =>
+  new Response(favicon, {
+    headers: {
+      "content-type": "image/png",
       "cache-control": DEV_MODE ? "no-store" : "public, max-age=300",
     },
   }),

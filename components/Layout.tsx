@@ -6,7 +6,8 @@ const Layout: FC = (props) => (
       <script src="https://unpkg.com/hyperscript.org@0.9.13"></script>
       <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
       <link rel="stylesheet" href="/assets/smingo.css" />
-      <script defer src="/assets/smingo.js"></script>
+      <script defer src="/assets/smingo.js" />
+      <link rel="icon" type="image/png" href="/assets/favicon.png" />
     </head>
     <body>
       <div id="smingoOverlay" hidden>
