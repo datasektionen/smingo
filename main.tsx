@@ -279,10 +279,22 @@ function setupPlayerSocket(ws: WebSocket) {
       broadcastAdminState();
     } else if (type === "state") {
       if (!session) return;
+      const previousBingoCount = session.bingoCount;
       session.clicked = normalizeClicked(data.clicked, session.board.length);
       session.lastUpdate = Date.now();
       session.bingoCount = computeBingoCount(session.board.length, session.clicked);
       broadcastAdminState();
+      if (session.bingoCount > previousBingoCount) {
+        const bingoNumber = session.bingoCount;
+        const chatPayload = JSON.stringify({
+          type: "chat",
+          userId: "",
+          message: `${session.userId} fick SMingo #${bingoNumber}.`,
+          timestamp: Date.now(),
+          categories: ["bingo"],
+        });
+        broadcastToPlayers(chatPayload);
+      }
     } else if (type === "chat") {
       if (!session) return;
       const rawMessage = typeof data.message === "string" ? data.message : "";
@@ -297,6 +309,7 @@ function setupPlayerSocket(ws: WebSocket) {
         userId: session.userId,
         message,
         timestamp: Date.now(),
+        categories: [],
       });
       broadcastToPlayers(chatPayload);
     }

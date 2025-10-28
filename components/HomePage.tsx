@@ -141,6 +141,7 @@ const HomePage: FC<HomePageProps> = ({ title, cells, localStorageIdent, userId }
       userId: typeof userId === "string" ? userId : "Unknown",
       message: message.trim(),
       timestamp: typeof timestamp === "number" ? timestamp : Date.now(),
+      categories: Array.isArray(event.categories) ? event.categories.filter((item) => typeof item === "string") : [],
     };
 
     chatHistory.push(entry);
@@ -152,10 +153,18 @@ const HomePage: FC<HomePageProps> = ({ title, cells, localStorageIdent, userId }
     }
 
     const wrapper = document.createElement("article");
-    wrapper.className = "chat-message";
+    const categories = new Set(entry.categories);
+    const baseClass = "chat-message";
+    wrapper.className = categories.has("bingo") ? baseClass + " chat-message--bingo" : baseClass;
 
     const header = document.createElement("header");
     header.className = "chat-message__meta";
+    if (categories.has("bingo")) {
+      const badge = document.createElement("span");
+      badge.className = "chat-message__badge";
+      badge.textContent = "SMingo!";
+      header.appendChild(badge);
+    }
     const idSpan = document.createElement("span");
     idSpan.className = "chat-message__user";
     idSpan.textContent = entry.userId;
@@ -167,7 +176,7 @@ const HomePage: FC<HomePageProps> = ({ title, cells, localStorageIdent, userId }
     header.appendChild(timeSpan);
 
     const body = document.createElement("p");
-    body.className = "chat-message__body";
+    body.className = categories.has("bingo") ? "chat-message__body chat-message__body--bingo" : "chat-message__body";
     body.textContent = entry.message;
 
     wrapper.appendChild(header);

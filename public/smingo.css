@@ -172,14 +172,34 @@ main.board-grid {
   border-radius: 10px;
   padding: 8px 10px;
   background: rgba(248, 250, 252, 0.85);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chat-message--bingo {
+  background: linear-gradient(135deg, rgba(255, 250, 205, 0.9), rgba(255, 228, 196, 0.92));
+  border-color: rgba(255, 165, 0, 0.4);
+  box-shadow: 0 6px 20px rgba(255, 140, 0, 0.3);
+  transform: translateY(-2px);
 }
 
 .chat-message__meta {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: #4a4a4a;
+  flex-wrap: wrap;
+}
+
+.chat-message__badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(255, 99, 71, 0.85);
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 8px;
 }
 
 .chat-message__user {
@@ -188,12 +208,19 @@ main.board-grid {
 
 .chat-message__time {
   font-variant-numeric: tabular-nums;
+  margin-left: auto;
 }
 
 .chat-message__body {
   font-size: 14px;
   color: #1f1f1f;
   word-break: break-word;
+  white-space: normal;
+}
+
+.chat-message__body--bingo {
+  font-weight: 600;
+  color: #8b2500;
 }
 
 .chat-form {

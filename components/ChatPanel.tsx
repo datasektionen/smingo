@@ -8,7 +8,6 @@ const ChatPanel: FC<ChatPanelProps> = ({ userId }) => (
   <aside class="chat-panel" aria-label="Live chat">
     <header class="chat-header">
       <h2>Chatt</h2>
-      <p class="chat-subtitle">Du chattar som <strong>{userId}</strong></p>
     </header>
     <div id="chatMessages" class="chat-messages" aria-live="polite" aria-relevant="additions">
       <p class="chat-placeholder">Hej världen!</p>
