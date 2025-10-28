@@ -13,13 +13,18 @@ const HomePage: FC<HomePageProps> = ({ title, cells, localStorageIdent, userId }
 
   return (
     <div class="home-content">
+      <div
+        id="highlightBanner"
+        class="highlight-banner"
+        aria-live="polite"
+        aria-atomic="true"
+      ></div>
       <header class="home-header">
         <div class="player-meta">
           <span>
             Logged in as <strong>{userId}</strong>
           </span>
         </div>
-        <h1>{title}</h1>
       </header>
       <div class="home-columns">
         <ChatPanel userId={userId} />
@@ -65,6 +70,25 @@ const HomePage: FC<HomePageProps> = ({ title, cells, localStorageIdent, userId }
   const chatPlaceholder = chatMessages ? chatMessages.querySelector(".chat-placeholder") : null;
   const chatHistory = [];
   const MAX_CHAT_MESSAGES = 50;
+  const highlightBanner = document.getElementById("highlightBanner");
+  const highlightAnimations = new Set();
+  const HIGHLIGHT_SPEED = 180; // pixels per second
+  const HIGHLIGHT_GAP = 24; // px gap between messages
+  const HIGHLIGHT_MIN_DURATION = 4; // seconds
+
+  function getHighlightTail(now) {
+    if (!highlightBanner) return window.innerWidth;
+    const bannerWidth = highlightBanner.clientWidth || window.innerWidth;
+    let tail = bannerWidth;
+    highlightAnimations.forEach((item) => {
+      const elapsed = (now - item.startTime) / 1000;
+      const currentRight = item.startX + item.width - elapsed * HIGHLIGHT_SPEED;
+      if (currentRight > tail) {
+        tail = currentRight;
+      }
+    });
+    return tail;
+  }
 
   function readFromStorage() {
     const result = [];
@@ -128,6 +152,64 @@ const HomePage: FC<HomePageProps> = ({ title, cells, localStorageIdent, userId }
     sendStateSnapshot(snapshot);
   }
 
+  function enqueueHighlight(event) {
+    if (!highlightBanner || !event || typeof event !== "object") return;
+    const user = typeof event.userId === "string" && event.userId ? event.userId : "Someone";
+    const cell = typeof event.cell === "string" && event.cell ? event.cell : "a square";
+    const text = user + ' fick "' + cell + '"';
+    const messageEl = document.createElement("div");
+    messageEl.className = "highlight-banner__message";
+    messageEl.textContent = text;
+    messageEl.style.visibility = "hidden";
+    highlightBanner.appendChild(messageEl);
+
+    const messageWidth = messageEl.getBoundingClientRect().width || 0;
+    const now = performance.now();
+    const bannerWidth = highlightBanner.clientWidth || window.innerWidth;
+    const startX = highlightAnimations.size > 0
+      ? Math.max(getHighlightTail(now) + HIGHLIGHT_GAP, bannerWidth)
+      : bannerWidth;
+    const travelDistance = startX + messageWidth;
+    const durationSeconds = Math.max(travelDistance / HIGHLIGHT_SPEED, HIGHLIGHT_MIN_DURATION);
+
+    highlightBanner.classList.add("is-visible");
+    messageEl.style.visibility = "";
+    messageEl.style.transform = "translate3d(" + startX + "px, -50%, 0)";
+
+    const animation = messageEl.animate(
+      [
+        { transform: "translate3d(" + startX + "px, -50%, 0)" },
+        { transform: "translate3d(" + -messageWidth + "px, -50%, 0)" },
+      ],
+      {
+        duration: durationSeconds * 1000,
+        easing: "linear",
+        fill: "forwards",
+      },
+    );
+
+    const animationRecord = {
+      el: messageEl,
+      startX,
+      width: messageWidth,
+      startTime: now,
+    };
+    highlightAnimations.add(animationRecord);
+
+    const cleanup = () => {
+      highlightAnimations.delete(animationRecord);
+      if (messageEl.parentElement === highlightBanner) {
+        highlightBanner.removeChild(messageEl);
+      }
+      if (highlightAnimations.size === 0) {
+        highlightBanner.classList.remove("is-visible");
+      }
+    };
+
+    animation.addEventListener("finish", cleanup);
+    animation.addEventListener("cancel", cleanup);
+  }
+
   function addChatMessage(event) {
     if (!chatMessages || !event || typeof event !== "object") return;
     const { userId, message, timestamp } = event;
@@ -162,7 +244,7 @@ const HomePage: FC<HomePageProps> = ({ title, cells, localStorageIdent, userId }
     if (categories.has("bingo")) {
       const badge = document.createElement("span");
       badge.className = "chat-message__badge";
-      badge.textContent = "SMingo!";
+      badge.textContent = "BINGO";
       header.appendChild(badge);
     }
     const idSpan = document.createElement("span");
@@ -219,6 +301,8 @@ const HomePage: FC<HomePageProps> = ({ title, cells, localStorageIdent, userId }
     if (!payload || typeof payload !== "object") return;
     if (payload.type === "chat") {
       addChatMessage(payload);
+    } else if (payload.type === "highlight") {
+      enqueueHighlight(payload);
     }
   }
 

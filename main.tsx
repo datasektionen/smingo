@@ -280,16 +280,31 @@ function setupPlayerSocket(ws: WebSocket) {
     } else if (type === "state") {
       if (!session) return;
       const previousBingoCount = session.bingoCount;
-      session.clicked = normalizeClicked(data.clicked, session.board.length);
+      const previousClicked = new Set(session.clicked);
+      const nextClicked = normalizeClicked(data.clicked, session.board.length);
+      const newCells = nextClicked.filter((index) => !previousClicked.has(index));
+      session.clicked = nextClicked;
       session.lastUpdate = Date.now();
       session.bingoCount = computeBingoCount(session.board.length, session.clicked);
       broadcastAdminState();
+      if (newCells.length > 0) {
+        for (const idx of newCells) {
+          const cellValue = session.board[idx] ?? `Cell ${idx + 1}`;
+          const highlightPayload = JSON.stringify({
+            type: "highlight",
+            userId: session.userId,
+            cell: cellValue,
+            timestamp: Date.now(),
+          });
+          broadcastToPlayers(highlightPayload);
+        }
+      }
       if (session.bingoCount > previousBingoCount) {
         const bingoNumber = session.bingoCount;
         const chatPayload = JSON.stringify({
           type: "chat",
-          userId: "",
-          message: `${session.userId} fick SMingo #${bingoNumber}.`,
+          userId: session.userId,
+          message: `${session.userId} got bingo #${bingoNumber}!`,
           timestamp: Date.now(),
           categories: ["bingo"],
         });

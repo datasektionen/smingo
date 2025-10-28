@@ -24,6 +24,7 @@ body {
   width: 100%;
   margin: 0 auto;
   padding: clamp(16px, 4vw, 32px);
+  padding-top: 4px;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -35,7 +36,6 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 24px;
   min-height: 0;
 }
 
@@ -44,6 +44,36 @@ body {
   flex-direction: column;
   gap: 8px;
   align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.highlight-banner {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  opacity: 0;
+  transition: height 0.25s ease, opacity 0.25s ease, margin 0.25s ease,
+    padding 0.25s ease;
+  pointer-events: none;
+  height: 30px;
+  margin-top: 4px;
+  opacity: 1;
+}
+
+.highlight-banner__message {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translate3d(100%, -50%, 0);
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #636363;
+  will-change: transform;
 }
 
 .home-header h1 {
@@ -176,7 +206,11 @@ main.board-grid {
 }
 
 .chat-message--bingo {
-  background: linear-gradient(135deg, rgba(255, 250, 205, 0.9), rgba(255, 228, 196, 0.92));
+  background: linear-gradient(
+    135deg,
+    rgba(255, 250, 205, 0.9),
+    rgba(255, 228, 196, 0.92)
+  );
   border-color: rgba(255, 165, 0, 0.4);
   box-shadow: 0 6px 20px rgba(255, 140, 0, 0.3);
   transform: translateY(-2px);
@@ -227,13 +261,6 @@ main.board-grid {
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.chat-label {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #555;
 }
 
 .chat-input-row {
