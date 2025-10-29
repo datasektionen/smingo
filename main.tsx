@@ -85,6 +85,7 @@ const RECENT_CHAT_LIMIT = 50;
 interface ChatRecord {
   type: "chat";
   userId: string;
+  kthId: string;
   message: string;
   timestamp: number;
   categories: string[];
@@ -393,6 +394,7 @@ function setupPlayerSocket(ws: WebSocket) {
         const chatPayload: ChatRecord = {
           type: "chat",
           userId: "",
+          kthId: session.kthId,
           message: `${session.userId} got bingo #${bingoNumber}!`,
           timestamp: Date.now(),
           categories: ["bingo"],
@@ -411,6 +413,7 @@ function setupPlayerSocket(ws: WebSocket) {
       const chatPayload: ChatRecord = {
         type: "chat",
         userId: session.userId,
+        kthId: session.kthId,
         message,
         timestamp: Date.now(),
         categories: [],
