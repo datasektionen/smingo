@@ -92,6 +92,7 @@ const HomePage: FC<HomePageProps> = ({
   const chatStatus = document.getElementById("chatStatus");
   const chatPlaceholder = chatMessages ? chatMessages.querySelector(".chat-placeholder") : null;
   const chatHistory = [];
+  const chatUserDirectory = new Map();
   const MAX_CHAT_MESSAGES = 50;
   const highlightBanner = document.getElementById("highlightBanner");
   const highlightItems = new Set();
@@ -399,6 +400,59 @@ const HomePage: FC<HomePageProps> = ({
     ensureHighlightLoop();
   }
 
+  function buildAvatarLabel(name) {
+    if (typeof name !== "string") return "?";
+    const trimmed = name.trim();
+    if (!trimmed) return "?";
+    const slices = trimmed.split(/\s+/).filter(Boolean);
+    if (slices.length === 0) return "?";
+    if (slices.length === 1) {
+      return slices[0].slice(0, 2).toUpperCase();
+    }
+    const first = slices[0][0] || "";
+    const last = slices[slices.length - 1][0] || "";
+    const initials = (first + last).trim();
+    return initials ? initials.toUpperCase() : trimmed.slice(0, 2).toUpperCase();
+  }
+
+  function createAvatarElement(entry, isContinuation) {
+    const avatar = document.createElement("div");
+    avatar.setAttribute("aria-hidden", "true");
+    if (isContinuation) {
+      avatar.className = "";
+      delete avatar.dataset.kthId;
+      return avatar;
+    }
+    avatar.className = "chat-message__avatar";
+    const kthId = typeof entry.kthId === "string" ? entry.kthId : "";
+    console.log("Creating avatar for", entry, "with KTH ID:", kthId);
+    if (kthId) {
+      avatar.textContent = "";
+      const img = document.createElement("img");
+      img.className = "chat-message__avatarImage";
+      img.alt = "";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.referrerPolicy = "no-referrer";
+      img.src = "https://zfinger.datasektionen.se/user/" + encodeURIComponent(kthId) + "/image/100";
+      img.addEventListener("error", () => {
+        img.remove();
+        avatar.classList.remove("chat-message__avatar--image");
+        avatar.textContent = buildAvatarLabel(entry.userId);
+        delete avatar.dataset.kthId;
+        entry.kthId = "";
+        chatUserDirectory.delete(entry.userId);
+      });
+      avatar.appendChild(img);
+      avatar.classList.add("chat-message__avatar--image");
+      avatar.dataset.kthId = kthId;
+    } else {
+      avatar.textContent = buildAvatarLabel(entry.userId);
+      delete avatar.dataset.kthId;
+    }
+    return avatar;
+  }
+
   function addChatMessage(event) {
     if (!chatMessages || !event || typeof event !== "object") return;
     const { userId, message, timestamp } = event;
@@ -408,12 +462,27 @@ const HomePage: FC<HomePageProps> = ({
       chatPlaceholder.remove();
     }
 
+    const previousEntry = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1] : null;
+
     const entry = {
       userId: typeof userId === "string" ? userId : "Unknown",
       message: message.trim(),
       timestamp: typeof timestamp === "number" ? timestamp : Date.now(),
       categories: Array.isArray(event.categories) ? event.categories.filter((item) => typeof item === "string") : [],
+      kthId: typeof event.kthId === "string" ? event.kthId : "",
     };
+
+    if (!entry.kthId && chatUserDirectory.has(entry.userId)) {
+      entry.kthId = chatUserDirectory.get(entry.userId) || "";
+    }
+
+    const isContinuation = !!previousEntry && previousEntry.userId === entry.userId;
+    if (!entry.kthId && isContinuation && previousEntry && previousEntry.kthId) {
+      entry.kthId = previousEntry.kthId;
+    }
+    if (entry.kthId) {
+      chatUserDirectory.set(entry.userId, entry.kthId);
+    }
 
     chatHistory.push(entry);
     while (chatHistory.length > MAX_CHAT_MESSAGES) {
@@ -427,32 +496,51 @@ const HomePage: FC<HomePageProps> = ({
     const categories = new Set(entry.categories);
     const baseClass = "chat-message";
     wrapper.className = categories.has("bingo") ? baseClass + " chat-message--bingo" : baseClass;
-
-    const header = document.createElement("header");
-    header.className = "chat-message__meta";
-    if (categories.has("bingo")) {
-      const badge = document.createElement("span");
-      badge.className = "chat-message__badge";
-      badge.textContent = "BINGO";
-      header.appendChild(badge);
+    wrapper.dataset.userId = entry.userId;
+    if (isContinuation) {
+      wrapper.classList.add("chat-message--continued");
     }
-    const idSpan = document.createElement("span");
-    idSpan.className = "chat-message__user";
-    idSpan.textContent = entry.userId;
-    const timeSpan = document.createElement("time");
-    timeSpan.className = "chat-message__time";
-    timeSpan.dateTime = new Date(entry.timestamp).toISOString();
-    timeSpan.textContent = new Date(entry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    header.appendChild(idSpan);
-    header.appendChild(timeSpan);
+
+    const avatar = createAvatarElement(entry, isContinuation);
+    const content = document.createElement("div");
+    content.className = "chat-message__content";
+
+    const shouldRenderMeta = categories.has("bingo") || !isContinuation;
+    if (shouldRenderMeta) {
+      const header = document.createElement("header");
+      header.className = "chat-message__meta";
+      if (categories.has("bingo")) {
+        const badge = document.createElement("span");
+        badge.className = "chat-message__badge";
+        badge.textContent = "BINGO";
+        header.appendChild(badge);
+      }
+      if (!isContinuation) {
+        const idSpan = document.createElement("span");
+        idSpan.className = "chat-message__user";
+        idSpan.textContent = entry.userId;
+        const timeSpan = document.createElement("time");
+        timeSpan.className = "chat-message__time";
+        timeSpan.dateTime = new Date(entry.timestamp).toISOString();
+        timeSpan.textContent = new Date(entry.timestamp).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        header.appendChild(idSpan);
+        header.appendChild(timeSpan);
+      }
+      content.appendChild(header);
+    }
 
     const body = document.createElement("p");
     body.className = categories.has("bingo") ? "chat-message__body chat-message__body--bingo" : "chat-message__body";
     const formattedMessage = formatChatMessageText(entry.message);
     body.appendChild(formattedMessage.fragment);
 
-    wrapper.appendChild(header);
-    wrapper.appendChild(body);
+    content.appendChild(body);
+    wrapper.appendChild(avatar);
+    wrapper.appendChild(content);
+
     chatMessages.appendChild(wrapper);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     if (formattedMessage.hasSelfPing) {
@@ -498,6 +586,7 @@ const HomePage: FC<HomePageProps> = ({
         chatMessages.innerHTML = "";
       }
       chatHistory.length = 0;
+      chatUserDirectory.clear();
       if (messages.length === 0) {
         if (chatMessages && chatPlaceholder) {
           chatMessages.appendChild(chatPlaceholder);
