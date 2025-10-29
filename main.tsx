@@ -105,6 +105,7 @@ const ATTACHMENT_VIDEO_EXTENSIONS = new Set([
   "ogv",
   "avi",
   "mkv",
+  "gifv",
 ]);
 const ATTACHMENT_MAX_SIZE_BYTES = 25 * 1024 * 1024;
 const IMAGE_UPLOAD_ENDPOINT = "https://imgcdn.dev/api/1/upload";
@@ -581,29 +582,22 @@ app.post("/api/upload", async (c: Context) => {
     }
   }
 
-  let body: Record<string, unknown>;
+  let form: FormData;
   try {
-    body = (await c.req.parseBody()) as Record<string, unknown>;
+    form = await c.req.formData();
   } catch (error) {
-    console.error("Failed to parse upload request body", error);
+    console.error("Failed to parse upload form data", error);
     return c.json({ error: "Invalid upload payload." }, 400);
   }
 
-  const pickFile = (value: unknown): File | null => {
-    if (value instanceof File) {
-      return value;
-    }
-    if (Array.isArray(value)) {
-      for (const entry of value) {
-        if (entry instanceof File) {
-          return entry;
-        }
-      }
-    }
+  const pickFile = (value: FormDataEntryValue | null): File | null => {
+    if (!value) return null;
+    if (value instanceof File) return value;
     return null;
   };
 
-  const fileEntry = pickFile(body.attachment ?? body.file ?? body.source);
+  const fileEntry =
+    pickFile(form.get("attachment")) ?? pickFile(form.get("file")) ?? pickFile(form.get("source"));
 
   if (!(fileEntry instanceof File)) {
     return c.json({ error: "No file provided." }, 400);

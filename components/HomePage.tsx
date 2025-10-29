@@ -159,6 +159,7 @@ const HomePage: FC<HomePageProps> = ({
     "ogv",
     "avi",
     "mkv",
+    "gifv",
   ]);
   const ATTACHMENT_MAX_SIZE_BYTES = 25 * 1024 * 1024;
   const CHEVERETO_HOSTNAME = "imgcdn.dev";
@@ -274,7 +275,7 @@ const HomePage: FC<HomePageProps> = ({
     return name.slice(lastDot + 1).toLowerCase();
   }
 
-  function determineAttachmentType(file, url) {
+function determineAttachmentType(file, url) {
     const typeHint = file && typeof file.type === "string" ? file.type.toLowerCase() : "";
     if (typeHint.startsWith("video/")) return "video";
     if (typeHint.startsWith("image/")) return "image";
@@ -282,6 +283,67 @@ const HomePage: FC<HomePageProps> = ({
     const ext = getFileExtension(source);
     if (ATTACHMENT_VIDEO_EXTENSIONS.has(ext)) return "video";
     return "image";
+  }
+
+  function normalizePreviewUrl(value) {
+    if (typeof value !== "string") return "";
+    const trimmed = value.trim();
+    if (!/^https?:\\/\\//i.test(trimmed)) return "";
+    try {
+      const parsed = new URL(trimmed);
+      return parsed.href;
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function inferPreviewTypeFromUrl(url) {
+    if (typeof url !== "string" || !url) return "";
+    let target = url;
+    try {
+      const parsed = new URL(url);
+      target = parsed.pathname || "";
+    } catch (_) {
+      const qIndex = url.indexOf("?");
+      target = qIndex === -1 ? url : url.slice(0, qIndex);
+    }
+    const ext = getFileExtension(target);
+    if (!ext) return "";
+    if (ATTACHMENT_VIDEO_EXTENSIONS.has(ext)) return "video";
+    if (ATTACHMENT_IMAGE_EXTENSIONS.has(ext)) return "image";
+    return "";
+  }
+
+  function createLinkPreview(url, type) {
+    if (!url || !type) return null;
+    const wrapper = document.createElement("div");
+    wrapper.className =
+      "chat-attachment " + (type === "video" ? "chat-attachment--video" : "chat-attachment--image");
+    const link = document.createElement("a");
+    link.className = "chat-attachmentLink";
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noreferrer noopener";
+
+    let media = null;
+    if (type === "video") {
+      media = document.createElement("video");
+      media.className = "chat-attachmentVideo";
+      media.controls = true;
+      media.preload = "metadata";
+      media.src = url;
+    } else {
+      media = document.createElement("img");
+      media.className = "chat-attachmentImage";
+      media.loading = "lazy";
+      media.decoding = "async";
+      media.alt = "";
+      media.src = url;
+    }
+
+    link.appendChild(media);
+    wrapper.appendChild(link);
+    return wrapper;
   }
 
   function isCheveretoUrl(url) {
@@ -527,6 +589,7 @@ const HomePage: FC<HomePageProps> = ({
     let hasSelfPing = false;
     const parts = message.match(/\\S+|\\s+/g) ?? [message];
     const urlPattern = /^(https?:\\/\\/[^\\s]+?)([.,!?)]*)$/i;
+    const urls = [];
 
     for (const part of parts) {
       if (!part) continue;
@@ -553,13 +616,18 @@ const HomePage: FC<HomePageProps> = ({
         const matches = part.match(urlPattern);
         const rawUrl = matches ? matches[1] : part;
         const trailing = matches ? matches[2] : "";
-        const anchor = document.createElement("a");
-        anchor.className = "chat-link";
-        anchor.href = rawUrl;
-        anchor.rel = "noreferrer noopener";
-        anchor.target = "_blank";
-        anchor.textContent = rawUrl;
-        fragment.append(anchor);
+        const normalizedUrl = normalizePreviewUrl(rawUrl) || rawUrl;
+        urls.push(normalizedUrl);
+        const type = inferPreviewTypeFromUrl(normalizedUrl);
+        if (!type) {
+          const anchor = document.createElement("a");
+          anchor.className = "chat-link";
+          anchor.href = normalizedUrl;
+          anchor.rel = "noreferrer noopener";
+          anchor.target = "_blank";
+          anchor.textContent = rawUrl;
+          fragment.append(anchor);
+        }
         if (trailing) {
           fragment.append(document.createTextNode(trailing));
         }
@@ -568,7 +636,7 @@ const HomePage: FC<HomePageProps> = ({
       }
     }
 
-    return { fragment, hasSelfPing };
+    return { fragment, hasSelfPing, urls };
   }
 
   function createAttachmentPreview(entry) {
@@ -596,21 +664,33 @@ const HomePage: FC<HomePageProps> = ({
       media.className = "chat-attachmentImage";
       media.loading = "lazy";
       media.decoding = "async";
-      media.alt = entry.attachmentName ? entry.attachmentName : "Attachment";
+      media.alt = "";
       media.src = entry.attachmentUrl;
     }
 
     link.appendChild(media);
     wrapper.appendChild(link);
 
-    if (entry.attachmentName) {
-      const caption = document.createElement("span");
-      caption.className = "chat-attachmentCaption";
-      caption.textContent = entry.attachmentName;
-      wrapper.appendChild(caption);
-    }
-
     return wrapper;
+  }
+
+  function appendLinkPreviews(urls, entry, container) {
+    if (!Array.isArray(urls) || urls.length === 0) return;
+    if (!container) return;
+    const seen = new Set();
+    if (entry && typeof entry.attachmentUrl === "string" && entry.attachmentUrl) {
+      seen.add(entry.attachmentUrl);
+    }
+    for (const raw of urls) {
+      const normalized = normalizePreviewUrl(raw);
+      if (!normalized || seen.has(normalized)) continue;
+      const type = inferPreviewTypeFromUrl(normalized);
+      if (!type) continue;
+      const preview = createLinkPreview(normalized, type);
+      if (!preview) continue;
+      container.appendChild(preview);
+      seen.add(normalized);
+    }
   }
 
   function send(message) {
@@ -832,6 +912,7 @@ const HomePage: FC<HomePageProps> = ({
     }
 
     let formattedMessage = null;
+    let linkUrls = [];
     if (entry.message) {
       const body = document.createElement("p");
       body.className = categories.has("bingo")
@@ -840,12 +921,17 @@ const HomePage: FC<HomePageProps> = ({
       formattedMessage = formatChatMessageText(entry.message);
       body.appendChild(formattedMessage.fragment);
       content.appendChild(body);
+      if (formattedMessage && Array.isArray(formattedMessage.urls)) {
+        linkUrls = formattedMessage.urls;
+      }
     }
 
     const attachmentElement = createAttachmentPreview(entry);
     if (attachmentElement) {
       content.appendChild(attachmentElement);
     }
+
+    appendLinkPreviews(linkUrls, entry, content);
 
     wrapper.appendChild(avatar);
     wrapper.appendChild(content);

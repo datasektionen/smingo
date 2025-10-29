@@ -261,15 +261,6 @@ main.board-grid {
   max-height: 320px;
 }
 
-.chat-attachmentCaption {
-  display: block;
-  padding: 8px 10px;
-  font-size: 12px;
-  color: #4b5563;
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.8);
-}
-
 .chat-message__meta {
   display: flex;
   align-items: baseline;
@@ -399,15 +390,15 @@ main.board-grid {
 
 .chat-message--ping .chat-message__body {
   background-color: rgba(255, 199, 135, 0.35);
-  border-radius: 2px;
-  box-shadow: 0 0 10px rgba(255, 199, 135, 0.85),
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(255, 199, 135, 0.35),
     0 0 6px rgba(255, 199, 135, 0.35);
 }
 
-.chat-message--bingo.chat-message--ping {
+/* .chat-message--bingo.chat-message--ping {
   box-shadow: 0 6px 20px rgba(255, 140, 0, 0.3),
     0 0 0 2px rgba(255, 165, 0, 0.45), 0 0 18px rgba(255, 140, 0, 0.35);
-}
+} */
 
 .chat-form {
   display: flex;
