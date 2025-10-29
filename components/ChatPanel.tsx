@@ -13,6 +13,7 @@ const ChatPanel: FC<ChatPanelProps> = ({ userId }) => (
       <p class="chat-placeholder">Hej världen!</p>
     </div>
     <form id="chatForm" class="chat-form" autocomplete="off">
+      <p class="chat-tips">Du kan pinga med @FörnamnEfternamn eller @kthid</p>
       <div class="chat-input-row">
         <input
           id="chatInput"

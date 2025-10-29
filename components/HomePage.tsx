@@ -428,6 +428,7 @@ const HomePage: FC<HomePageProps> = ({
     console.log("Creating avatar for", entry, "with KTH ID:", kthId);
     if (kthId) {
       avatar.textContent = "";
+      avatar.setAttribute("title", kthId);
       const img = document.createElement("img");
       img.className = "chat-message__avatarImage";
       img.alt = "";
