@@ -90,6 +90,10 @@ const HomePage: FC<HomePageProps> = ({
   const chatForm = document.getElementById("chatForm");
   const chatInput = document.getElementById("chatInput");
   const chatStatus = document.getElementById("chatStatus");
+  const chatAttachButton = document.getElementById("chatAttachButton");
+  const chatFileInput = document.getElementById("chatFileInput");
+  const chatSubmitButton = chatForm ? chatForm.querySelector(".chat-submit") : null;
+  const chatAttachmentInfo = document.getElementById("chatAttachmentInfo");
   const chatPlaceholder = chatMessages ? chatMessages.querySelector(".chat-placeholder") : null;
   const chatHistory = [];
   const chatUserDirectory = new Map();
@@ -133,6 +137,232 @@ const HomePage: FC<HomePageProps> = ({
     push(config.userId);
     return { set: targetSet, normalize };
   })();
+  const ATTACHMENT_ALLOWED_MIME_PREFIXES = ["image/", "video/"];
+  const ATTACHMENT_IMAGE_EXTENSIONS = new Set([
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "webp",
+    "avif",
+    "bmp",
+    "heic",
+    "heif",
+    "apng",
+  ]);
+  const ATTACHMENT_VIDEO_EXTENSIONS = new Set([
+    "mp4",
+    "webm",
+    "mov",
+    "m4v",
+    "ogg",
+    "ogv",
+    "avi",
+    "mkv",
+  ]);
+  const ATTACHMENT_MAX_SIZE_BYTES = 25 * 1024 * 1024;
+  const CHEVERETO_HOSTNAME = "imgcdn.dev";
+  let pendingAttachment = null;
+  let isUploadingAttachment = false;
+  let statusMode = "idle";
+
+  function setStatus(text, mode = "info", severity = "info") {
+    if (!chatStatus) return;
+    statusMode = mode;
+    chatStatus.textContent = text;
+    if (text && severity) {
+      chatStatus.dataset.severity = severity;
+    } else {
+      chatStatus.removeAttribute("data-severity");
+    }
+  }
+
+  function clearStatus(mode) {
+    if (!chatStatus) return;
+    if (mode && statusMode !== mode) return;
+    statusMode = "idle";
+    chatStatus.textContent = "";
+    chatStatus.removeAttribute("data-severity");
+  }
+
+  function formatFileSize(bytes) {
+    if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes <= 0) {
+      return "0 B";
+    }
+    const units = ["B", "KB", "MB", "GB"];
+    let idx = 0;
+    let value = bytes;
+    while (value >= 1024 && idx < units.length - 1) {
+      value /= 1024;
+      idx++;
+    }
+    const decimals = value >= 10 || idx === 0 ? 0 : 1;
+    return value.toFixed(decimals) + " " + units[idx];
+  }
+
+  function describeAttachment(file) {
+    if (!file) return "";
+    return file.name + " (" + formatFileSize(file.size) + ")";
+  }
+
+  function updateAttachmentInfo(text = "") {
+    if (!chatAttachmentInfo) return;
+    chatAttachmentInfo.textContent = text;
+    if (text) {
+      chatAttachmentInfo.dataset.visible = "1";
+    } else {
+      delete chatAttachmentInfo.dataset.visible;
+    }
+  }
+
+  function isAllowedAttachment(file) {
+    if (!file) return false;
+    if (
+      typeof file.type === "string" &&
+      ATTACHMENT_ALLOWED_MIME_PREFIXES.some((prefix) => file.type.startsWith(prefix))
+    ) {
+      return true;
+    }
+    if (typeof file.name !== "string" || file.name.lastIndexOf(".") === -1) {
+      return false;
+    }
+    const ext = file.name.slice(file.name.lastIndexOf(".") + 1).toLowerCase();
+    return ATTACHMENT_IMAGE_EXTENSIONS.has(ext) || ATTACHMENT_VIDEO_EXTENSIONS.has(ext);
+  }
+
+  function resetAttachment() {
+    pendingAttachment = null;
+    if (chatFileInput instanceof HTMLInputElement) {
+      chatFileInput.value = "";
+    } else if (chatFileInput) {
+      chatFileInput.removeAttribute("value");
+    }
+    if (chatAttachButton) {
+      chatAttachButton.removeAttribute("data-selected");
+    }
+    updateAttachmentInfo("");
+  }
+
+  function setUploadingState(active) {
+    isUploadingAttachment = active;
+    if (chatForm) {
+      chatForm.classList.toggle("chat-form--uploading", active);
+      if (active) {
+        chatForm.setAttribute("aria-busy", "true");
+      } else {
+        chatForm.removeAttribute("aria-busy");
+      }
+    }
+    if (chatInput instanceof HTMLInputElement) {
+      chatInput.readOnly = active;
+      chatInput.classList.toggle("chat-input--uploading", active);
+    }
+    if (chatSubmitButton instanceof HTMLButtonElement) {
+      chatSubmitButton.disabled = active;
+    }
+    if (chatAttachButton instanceof HTMLButtonElement) {
+      chatAttachButton.disabled = active;
+    } else if (chatAttachButton) {
+      chatAttachButton.setAttribute("aria-disabled", active ? "true" : "false");
+    }
+  }
+
+  function getFileExtension(name) {
+    if (typeof name !== "string") return "";
+    const lastDot = name.lastIndexOf(".");
+    if (lastDot === -1 || lastDot === name.length - 1) return "";
+    return name.slice(lastDot + 1).toLowerCase();
+  }
+
+  function determineAttachmentType(file, url) {
+    const typeHint = file && typeof file.type === "string" ? file.type.toLowerCase() : "";
+    if (typeHint.startsWith("video/")) return "video";
+    if (typeHint.startsWith("image/")) return "image";
+    const source = file && typeof file.name === "string" ? file.name : url;
+    const ext = getFileExtension(source);
+    if (ATTACHMENT_VIDEO_EXTENSIONS.has(ext)) return "video";
+    return "image";
+  }
+
+  function isCheveretoUrl(url) {
+    if (typeof url !== "string" || !url) return false;
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "https:") return false;
+      const host = parsed.hostname.toLowerCase();
+      return host === CHEVERETO_HOSTNAME || host.endsWith("." + CHEVERETO_HOSTNAME);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function setAttachment(file) {
+    pendingAttachment = file;
+    if (chatAttachButton) {
+      chatAttachButton.setAttribute("data-selected", "1");
+    }
+    updateAttachmentInfo("Bilaga: " + describeAttachment(file));
+  }
+
+  async function uploadAttachment(file) {
+    const formData = new FormData();
+    const filename = typeof file.name === "string" && file.name ? file.name : "upload";
+    formData.append("attachment", file, filename);
+
+    let response;
+    try {
+      response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+    } catch (networkError) {
+      throw new Error(networkError && networkError.message ? networkError.message : "Network error");
+    }
+
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (_) {
+      throw new Error("Upload failed: Unexpected response");
+    }
+
+    const errorDetail =
+      (payload && typeof payload.error === "string" && payload.error) ||
+      (payload &&
+        payload.error &&
+        typeof payload.error === "object" &&
+        typeof payload.error.message === "string" &&
+        payload.error.message) ||
+      (payload && typeof payload.message === "string" && payload.message) ||
+      "";
+
+    if (!response.ok || errorDetail) {
+      const errorMessage =
+        errorDetail ||
+        response.statusText ||
+        "Upload failed";
+      throw new Error(errorMessage);
+    }
+
+    const url = payload && typeof payload.url === "string" ? payload.url : "";
+    const typeHint = payload && typeof payload.type === "string" ? payload.type : "";
+    const nameHint = payload && typeof payload.name === "string" ? payload.name : "";
+
+    if (!url) {
+      throw new Error("Upload completed without a usable URL");
+    }
+    if (!isCheveretoUrl(url)) {
+      throw new Error("Upload completed with an unexpected host");
+    }
+    const type =
+      typeHint === "video"
+        ? "video"
+        : typeHint === "image"
+        ? "image"
+        : determineAttachmentType(file, url);
+    const name = nameHint || (typeof file.name === "string" ? file.name : "");
+    return { url, type, name };
+  }
 
   function computeHighlightSpeed() {
     const backlog = Math.max(highlightItems.size, 1);
@@ -296,6 +526,7 @@ const HomePage: FC<HomePageProps> = ({
     const fragment = document.createDocumentFragment();
     let hasSelfPing = false;
     const parts = message.match(/\\S+|\\s+/g) ?? [message];
+    const urlPattern = /^(https?:\\/\\/[^\\s]+?)([.,!?)]*)$/i;
 
     for (const part of parts) {
       if (!part) continue;
@@ -318,12 +549,68 @@ const HomePage: FC<HomePageProps> = ({
         if (remainder) {
           fragment.append(document.createTextNode(remainder));
         }
+      } else if (urlPattern.test(part)) {
+        const matches = part.match(urlPattern);
+        const rawUrl = matches ? matches[1] : part;
+        const trailing = matches ? matches[2] : "";
+        const anchor = document.createElement("a");
+        anchor.className = "chat-link";
+        anchor.href = rawUrl;
+        anchor.rel = "noreferrer noopener";
+        anchor.target = "_blank";
+        anchor.textContent = rawUrl;
+        fragment.append(anchor);
+        if (trailing) {
+          fragment.append(document.createTextNode(trailing));
+        }
       } else {
         fragment.append(document.createTextNode(part));
       }
     }
 
     return { fragment, hasSelfPing };
+  }
+
+  function createAttachmentPreview(entry) {
+    if (!entry || typeof entry.attachmentUrl !== "string" || !entry.attachmentUrl) return null;
+    if (!isCheveretoUrl(entry.attachmentUrl)) return null;
+    const type = entry.attachmentType === "video" ? "video" : "image";
+    const wrapper = document.createElement("div");
+    wrapper.className =
+      "chat-attachment " + (type === "video" ? "chat-attachment--video" : "chat-attachment--image");
+    const link = document.createElement("a");
+    link.className = "chat-attachmentLink";
+    link.href = entry.attachmentUrl;
+    link.target = "_blank";
+    link.rel = "noreferrer noopener";
+
+    let media = null;
+    if (type === "video") {
+      media = document.createElement("video");
+      media.className = "chat-attachmentVideo";
+      media.controls = true;
+      media.preload = "metadata";
+      media.src = entry.attachmentUrl;
+    } else {
+      media = document.createElement("img");
+      media.className = "chat-attachmentImage";
+      media.loading = "lazy";
+      media.decoding = "async";
+      media.alt = entry.attachmentName ? entry.attachmentName : "Attachment";
+      media.src = entry.attachmentUrl;
+    }
+
+    link.appendChild(media);
+    wrapper.appendChild(link);
+
+    if (entry.attachmentName) {
+      const caption = document.createElement("span");
+      caption.className = "chat-attachmentCaption";
+      caption.textContent = entry.attachmentName;
+      wrapper.appendChild(caption);
+    }
+
+    return wrapper;
   }
 
   function send(message) {
@@ -425,7 +712,6 @@ const HomePage: FC<HomePageProps> = ({
     }
     avatar.className = "chat-message__avatar";
     const kthId = typeof entry.kthId === "string" ? entry.kthId : "";
-    console.log("Creating avatar for", entry, "with KTH ID:", kthId);
     if (kthId) {
       avatar.textContent = "";
       avatar.setAttribute("title", kthId);
@@ -456,8 +742,17 @@ const HomePage: FC<HomePageProps> = ({
 
   function addChatMessage(event) {
     if (!chatMessages || !event || typeof event !== "object") return;
-    const { userId, message, timestamp } = event;
-    if (typeof message !== "string" || !message.trim()) return;
+    const { userId, timestamp } = event;
+    const rawMessage = typeof event.message === "string" ? event.message : "";
+    const trimmedMessage = rawMessage.trim();
+    const attachmentUrl = typeof event.attachmentUrl === "string" ? event.attachmentUrl : "";
+    const attachmentType =
+      event.attachmentType === "video" ? "video" : event.attachmentType === "image" ? "image" : "";
+    const attachmentName =
+      typeof event.attachmentName === "string"
+        ? event.attachmentName.replace(/[\\r\\n]+/g, " ").slice(0, 120)
+        : "";
+    if (!trimmedMessage && !attachmentUrl) return;
 
     if (chatPlaceholder) {
       chatPlaceholder.remove();
@@ -467,10 +762,13 @@ const HomePage: FC<HomePageProps> = ({
 
     const entry = {
       userId: typeof userId === "string" ? userId : "Unknown",
-      message: message.trim(),
+      message: trimmedMessage,
       timestamp: typeof timestamp === "number" ? timestamp : Date.now(),
       categories: Array.isArray(event.categories) ? event.categories.filter((item) => typeof item === "string") : [],
       kthId: typeof event.kthId === "string" ? event.kthId : "",
+      attachmentUrl,
+      attachmentType,
+      attachmentName,
     };
 
     if (!entry.kthId && chatUserDirectory.has(entry.userId)) {
@@ -533,39 +831,139 @@ const HomePage: FC<HomePageProps> = ({
       content.appendChild(header);
     }
 
-    const body = document.createElement("p");
-    body.className = categories.has("bingo") ? "chat-message__body chat-message__body--bingo" : "chat-message__body";
-    const formattedMessage = formatChatMessageText(entry.message);
-    body.appendChild(formattedMessage.fragment);
+    let formattedMessage = null;
+    if (entry.message) {
+      const body = document.createElement("p");
+      body.className = categories.has("bingo")
+        ? "chat-message__body chat-message__body--bingo"
+        : "chat-message__body";
+      formattedMessage = formatChatMessageText(entry.message);
+      body.appendChild(formattedMessage.fragment);
+      content.appendChild(body);
+    }
 
-    content.appendChild(body);
+    const attachmentElement = createAttachmentPreview(entry);
+    if (attachmentElement) {
+      content.appendChild(attachmentElement);
+    }
+
     wrapper.appendChild(avatar);
     wrapper.appendChild(content);
 
     chatMessages.appendChild(wrapper);
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    if (formattedMessage.hasSelfPing) {
+    if (formattedMessage && formattedMessage.hasSelfPing) {
       wrapper.classList.add("chat-message--ping");
     }
   }
 
-  function handleChatSubmit(event) {
+  async function handleChatSubmit(event) {
     event.preventDefault();
-    if (!chatInput) return;
+    if (!chatInput || isUploadingAttachment) return;
     const value = chatInput.value.trim();
-    if (!value) return;
+    const file = pendingAttachment;
+    if (!value && !file) return;
 
-    if (!send({ type: "chat", message: value })) {
-      if (chatStatus) {
-        chatStatus.textContent = "Connection lost. Trying to reconnect…";
+    let attachmentUrl = "";
+    let attachmentType = "";
+    let attachmentName = "";
+
+    if (file) {
+      if (typeof file.size === "number" && file.size > ATTACHMENT_MAX_SIZE_BYTES) {
+        setStatus(
+          "Attachment is too large (" + formatFileSize(file.size) + "). Max " +
+            formatFileSize(ATTACHMENT_MAX_SIZE_BYTES) + ".",
+          "attachment",
+          "error",
+        );
+        return;
       }
+      setStatus("Uploading " + describeAttachment(file) + "…", "upload", "info");
+      setUploadingState(true);
+      try {
+        const uploaded = await uploadAttachment(file);
+        attachmentUrl = uploaded.url;
+        attachmentType = uploaded.type || determineAttachmentType(file, uploaded.url);
+        attachmentName =
+          uploaded.name ||
+          (typeof file.name === "string" && file.name ? file.name : "");
+        const displayName = attachmentName || describeAttachment(file);
+        setStatus("Attachment uploaded: " + displayName, "upload", "success");
+      } catch (error) {
+        const message =
+          error && typeof error.message === "string" && error.message
+            ? error.message
+            : "Upload failed";
+        setStatus("Upload failed: " + message, "upload", "error");
+        return;
+      } finally {
+        setUploadingState(false);
+      }
+    }
+
+    const payload = { type: "chat", message: value };
+    if (attachmentUrl) {
+      payload.attachmentUrl = attachmentUrl;
+      payload.attachmentType = attachmentType;
+      if (attachmentName) {
+        payload.attachmentName = attachmentName;
+      }
+    }
+
+    if (!send(payload)) {
+      setStatus("Connection lost. Trying to reconnect…", "send", "error");
       return;
     }
 
     chatInput.value = "";
-    if (chatStatus) {
-      chatStatus.textContent = "";
+    if (attachmentUrl) {
+      resetAttachment();
     }
+    clearStatus("upload");
+    clearStatus("attachment");
+    clearStatus("send");
+  }
+
+  if (chatAttachButton) {
+    chatAttachButton.addEventListener("click", () => {
+      if (isUploadingAttachment) return;
+      if (pendingAttachment) {
+        resetAttachment();
+        setStatus("Attachment removed.", "attachment", "info");
+        window.setTimeout(() => clearStatus("attachment"), 3000);
+      } else if (chatFileInput instanceof HTMLInputElement) {
+        chatFileInput.click();
+      }
+    });
+  }
+
+  if (chatFileInput instanceof HTMLInputElement) {
+    chatFileInput.addEventListener("change", () => {
+      const file = chatFileInput.files && chatFileInput.files[0] ? chatFileInput.files[0] : null;
+      if (!file) {
+        resetAttachment();
+        clearStatus("attachment");
+        return;
+      }
+      if (!isAllowedAttachment(file)) {
+        setStatus("Only images or videos are allowed.", "attachment", "error");
+        resetAttachment();
+        return;
+      }
+      if (typeof file.size === "number" && file.size > ATTACHMENT_MAX_SIZE_BYTES) {
+        setStatus(
+          "Attachment is too large (" + formatFileSize(file.size) + "). Max " +
+            formatFileSize(ATTACHMENT_MAX_SIZE_BYTES) + ".",
+          "attachment",
+          "error",
+        );
+        resetAttachment();
+        return;
+      }
+      setAttachment(file);
+      setStatus("Attachment ready: " + describeAttachment(file), "attachment", "info");
+      window.setTimeout(() => clearStatus("attachment"), 4000);
+    });
   }
 
   if (chatForm) {
@@ -645,16 +1043,13 @@ const HomePage: FC<HomePageProps> = ({
       } else {
         document.addEventListener("DOMContentLoaded", sendDomState, { once: true });
       }
-      if (chatStatus) {
-        chatStatus.textContent = "";
-      }
+      clearStatus("connection");
+      clearStatus("send");
     });
     socket.addEventListener("close", () => {
       socket = null;
       scheduleReconnect();
-      if (chatStatus) {
-        chatStatus.textContent = "Disconnected. Reconnecting…";
-      }
+      setStatus("Disconnected. Reconnecting…", "connection", "error");
     });
     socket.addEventListener("error", () => {
       if (socket) {

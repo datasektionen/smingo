@@ -4,6 +4,7 @@
 //Läskig AI kod men fixades samma dag som SM
 
 import { Context, Hono } from "hono";
+import type { StatusCode } from "hono/utils/http-status";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import Layout from "./components/Layout.tsx";
 import HomePage from "./components/HomePage.tsx";
@@ -81,6 +82,33 @@ const adminSockets = new Set<WebSocket>();
 const playerSockets = new Map<string, WebSocket>();
 let playerCounter = 0;
 const RECENT_CHAT_LIMIT = 50;
+const ATTACHMENT_HOSTNAME = "imgcdn.dev";
+const ATTACHMENT_ALLOWED_MIME_PREFIXES = ["image/", "video/"];
+const ATTACHMENT_IMAGE_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "gif",
+  "webp",
+  "avif",
+  "bmp",
+  "heic",
+  "heif",
+  "apng",
+]);
+const ATTACHMENT_VIDEO_EXTENSIONS = new Set([
+  "mp4",
+  "webm",
+  "mov",
+  "m4v",
+  "ogg",
+  "ogv",
+  "avi",
+  "mkv",
+]);
+const ATTACHMENT_MAX_SIZE_BYTES = 25 * 1024 * 1024;
+const IMAGE_UPLOAD_ENDPOINT = "https://imgcdn.dev/api/1/upload";
+const IMAGE_UPLOAD_KEY = "5386e05a3562c7a8f984e73401540836";
 
 interface ChatRecord {
   type: "chat";
@@ -89,6 +117,9 @@ interface ChatRecord {
   message: string;
   timestamp: number;
   categories: string[];
+  attachmentUrl?: string;
+  attachmentType?: "image" | "video";
+  attachmentName?: string;
 }
 
 const recentChatMessages: ChatRecord[] = [];
@@ -122,6 +153,113 @@ function serializePlayers() {
       if (userCompare !== 0) return userCompare;
       return a.id.localeCompare(b.id);
     });
+}
+
+function getFileExtension(path: string): string {
+  const lastDot = path.lastIndexOf(".");
+  if (lastDot === -1 || lastDot === path.length - 1) {
+    return "";
+  }
+  return path.slice(lastDot + 1).toLowerCase();
+}
+
+function sanitizeAttachmentInput(
+  urlValue: unknown,
+  typeValue: unknown,
+  nameValue: unknown,
+): { url: string; type: "image" | "video"; name: string } | null {
+  if (typeof urlValue !== "string") return null;
+  const trimmedUrl = urlValue.trim();
+  if (!trimmedUrl) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmedUrl);
+  } catch (_) {
+    return null;
+  }
+  if (parsed.protocol !== "https:") return null;
+  const host = parsed.hostname.toLowerCase();
+  if (host !== ATTACHMENT_HOSTNAME && !host.endsWith(`.${ATTACHMENT_HOSTNAME}`)) {
+    return null;
+  }
+  const cleanUrl = parsed.toString();
+
+  let type: "image" | "video";
+  if (typeValue === "video") {
+    type = "video";
+  } else if (typeValue === "image") {
+    type = "image";
+  } else {
+    const ext = getFileExtension(parsed.pathname);
+    if (ATTACHMENT_VIDEO_EXTENSIONS.has(ext)) {
+      type = "video";
+    } else if (ATTACHMENT_IMAGE_EXTENSIONS.has(ext) || ext === "") {
+      type = "image";
+    } else {
+      return null;
+    }
+  }
+
+  let name = "";
+  if (typeof nameValue === "string") {
+    name = nameValue.replace(/\r|\n/g, " ").trim();
+    if (name.length > 120) {
+      name = name.slice(0, 120);
+    }
+  }
+
+  return { url: cleanUrl, type, name };
+}
+
+function extractUploadUrl(payload: unknown): string {
+  if (!payload || typeof payload !== "object" || payload === null) {
+    return "";
+  }
+  const record = payload as Record<string, unknown>;
+  const directCandidates = [record.url, record.display_url, record.url_viewer];
+  for (const candidate of directCandidates) {
+    if (typeof candidate === "string" && candidate.startsWith("http")) {
+      return candidate;
+    }
+  }
+
+  const nestedKeys = ["image", "data", "upload", "medium", "thumb"];
+  for (const key of nestedKeys) {
+    const nested = record[key];
+    const nestedUrl = extractUploadUrl(nested);
+    if (nestedUrl) {
+      return nestedUrl;
+    }
+  }
+
+  const images = record.images;
+  if (Array.isArray(images)) {
+    for (const entry of images) {
+      const nestedUrl = extractUploadUrl(entry);
+      if (nestedUrl) {
+        return nestedUrl;
+      }
+    }
+  }
+
+  return "";
+}
+
+function extractUploadError(payload: unknown): string {
+  if (!payload || typeof payload !== "object" || payload === null) {
+    return "";
+  }
+  const record = payload as Record<string, unknown>;
+  if (typeof record.error === "string" && record.error) {
+    return record.error;
+  }
+  if (record.error && typeof record.error === "object" && record.error !== null) {
+    const nested = record.error as Record<string, unknown>;
+    if (typeof nested.message === "string" && nested.message) {
+      return nested.message;
+    }
+  }
+  return "";
 }
 
 function createAdminPayload() {
@@ -404,12 +542,17 @@ function setupPlayerSocket(ws: WebSocket) {
     } else if (type === "chat") {
       if (!session) return;
       const rawMessage = typeof data.message === "string" ? data.message : "";
+      const attachment = sanitizeAttachmentInput(
+        data.attachmentUrl,
+        data.attachmentType,
+        data.attachmentName,
+      );
       const message = rawMessage
         .replace(/[\r\n]+/g, " ")
         .replace(/\s{2,}/g, " ")
         .trim()
         .slice(0, 300);
-      if (!message) return;
+      if (!message && !attachment) return;
       const chatPayload: ChatRecord = {
         type: "chat",
         userId: session.userId,
@@ -418,10 +561,144 @@ function setupPlayerSocket(ws: WebSocket) {
         timestamp: Date.now(),
         categories: [],
       };
+      if (attachment) {
+        chatPayload.attachmentUrl = attachment.url;
+        chatPayload.attachmentType = attachment.type;
+        if (attachment.name) {
+          chatPayload.attachmentName = attachment.name;
+        }
+      }
       broadcastChatMessage(chatPayload);
     }
   });
 }
+
+app.post("/api/upload", async (c: Context) => {
+  if (!DEV_MODE) {
+    const kthid = await getSignedCookie(c, cookieSecret!, "kthid");
+    if (typeof kthid !== "string") {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await c.req.parseBody()) as Record<string, unknown>;
+  } catch (error) {
+    console.error("Failed to parse upload request body", error);
+    return c.json({ error: "Invalid upload payload." }, 400);
+  }
+
+  const pickFile = (value: unknown): File | null => {
+    if (value instanceof File) {
+      return value;
+    }
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (entry instanceof File) {
+          return entry;
+        }
+      }
+    }
+    return null;
+  };
+
+  const fileEntry = pickFile(body.attachment ?? body.file ?? body.source);
+
+  if (!(fileEntry instanceof File)) {
+    return c.json({ error: "No file provided." }, 400);
+  }
+
+  if (!fileEntry.size) {
+    return c.json({ error: "File is empty." }, 400);
+  }
+
+  if (fileEntry.size > ATTACHMENT_MAX_SIZE_BYTES) {
+    return c.json(
+      {
+        error: `Attachment is too large. Max ${Math.round(ATTACHMENT_MAX_SIZE_BYTES / (1024 * 1024))} MB.`,
+      },
+      413,
+    );
+  }
+
+  const mimeType = typeof fileEntry.type === "string" ? fileEntry.type : "";
+  const extension = getFileExtension(fileEntry.name || "");
+  const mimeAllowed =
+    mimeType && ATTACHMENT_ALLOWED_MIME_PREFIXES.some((prefix) => mimeType.startsWith(prefix));
+  const extAllowed = extension
+    ? ATTACHMENT_IMAGE_EXTENSIONS.has(extension) || ATTACHMENT_VIDEO_EXTENSIONS.has(extension)
+    : false;
+
+  if (!mimeAllowed && !extAllowed) {
+    return c.json({ error: "Only images or videos are allowed." }, 415);
+  }
+
+  const forwardForm = new FormData();
+  forwardForm.append("action", "upload");
+  forwardForm.append("key", IMAGE_UPLOAD_KEY);
+  forwardForm.append("format", "json");
+  forwardForm.append("source", fileEntry, fileEntry.name || "upload");
+
+  let upstreamResponse: Response;
+  try {
+    upstreamResponse = await fetch(IMAGE_UPLOAD_ENDPOINT, {
+      method: "POST",
+      body: forwardForm,
+    });
+  } catch (error) {
+    console.error("Image upload upstream request failed", error);
+    return c.json({ error: "Failed to contact the image host." }, 502);
+  }
+
+  let upstreamPayload: unknown;
+  try {
+    upstreamPayload = await upstreamResponse.json();
+  } catch (error) {
+    console.error("Image upload upstream response not JSON", error);
+    return c.json({ error: "Unexpected response from the image host." }, 502);
+  }
+
+  const upstreamStatus =
+    upstreamPayload && typeof upstreamPayload === "object"
+      ? (upstreamPayload as Record<string, unknown>).status_code
+      : undefined;
+  const upstreamError = extractUploadError(upstreamPayload);
+
+  if (!upstreamResponse.ok || (typeof upstreamStatus === "number" && upstreamStatus >= 300) || upstreamError) {
+    console.error(
+      "Image upload upstream returned error",
+      upstreamResponse.status,
+      upstreamResponse.statusText,
+      upstreamError,
+    );
+    const status = (upstreamResponse.ok ? 502 : upstreamResponse.status) as StatusCode;
+    c.status(status);
+    return c.json({ error: upstreamError || "Upload was rejected by the image host." });
+  }
+
+  const url = extractUploadUrl(upstreamPayload);
+  if (!url) {
+    console.error("Image upload upstream missing URL", upstreamPayload);
+    return c.json({ error: "Image host did not return a usable URL." }, 502);
+  }
+
+  const sanitized = sanitizeAttachmentInput(
+    url,
+    mimeType.startsWith("video/") ? "video" : mimeType.startsWith("image/") ? "image" : extension,
+    fileEntry.name,
+  );
+  if (!sanitized) {
+    console.error("Image upload URL failed sanitization", url);
+    return c.json({ error: "Image host returned an unsupported URL." }, 502);
+  }
+
+  return c.json({
+    url: sanitized.url,
+    type: sanitized.type,
+    name: sanitized.name || (typeof fileEntry.name === "string" ? fileEntry.name : ""),
+  });
+});
 
 app.get("/assets/smingo.css", () =>
   new Response(smingoCss, {
