@@ -29,7 +29,9 @@ export async function handleUploadRequest(c: Context): Promise<Response> {
   };
 
   const fileEntry =
-    pickFile(form.get("attachment")) ?? pickFile(form.get("file")) ?? pickFile(form.get("source"));
+    pickFile(form.get("attachment")) ??
+    pickFile(form.get("file")) ??
+    pickFile(form.get("source"));
 
   if (!(fileEntry instanceof File)) {
     return c.json({ error: "No file provided." }, 400);
@@ -42,18 +44,24 @@ export async function handleUploadRequest(c: Context): Promise<Response> {
   if (fileEntry.size > ATTACHMENT_MAX_SIZE_BYTES) {
     return c.json(
       {
-        error: `Attachment is too large. Max ${Math.round(ATTACHMENT_MAX_SIZE_BYTES / (1024 * 1024))} MB.`,
+        error: `Attachment is too large. Max ${Math.round(
+          ATTACHMENT_MAX_SIZE_BYTES / (1024 * 1024)
+        )} MB.`,
       },
-      413,
+      413
     );
   }
 
   const mimeType = typeof fileEntry.type === "string" ? fileEntry.type : "";
   const extension = getFileExtension(fileEntry.name || "");
   const mimeAllowed =
-    mimeType && ATTACHMENT_ALLOWED_MIME_PREFIXES.some((prefix) => mimeType.startsWith(prefix));
+    mimeType &&
+    ATTACHMENT_ALLOWED_MIME_PREFIXES.some((prefix) =>
+      mimeType.startsWith(prefix)
+    );
   const extAllowed = extension
-    ? ATTACHMENT_IMAGE_EXTENSIONS.has(extension) || ATTACHMENT_VIDEO_EXTENSIONS.has(extension)
+    ? ATTACHMENT_IMAGE_EXTENSIONS.has(extension) ||
+      ATTACHMENT_VIDEO_EXTENSIONS.has(extension)
     : false;
 
   if (!mimeAllowed && !extAllowed) {
@@ -64,7 +72,8 @@ export async function handleUploadRequest(c: Context): Promise<Response> {
   forwardForm.append("action", "upload");
   forwardForm.append("key", IMAGE_UPLOAD_KEY);
   forwardForm.append("format", "json");
-  forwardForm.append("source", fileEntry, fileEntry.name || "upload");
+
+  forwardForm.append("image", fileEntry, fileEntry.name || "upload");
 
   let upstreamResponse: Response;
   try {
@@ -91,16 +100,24 @@ export async function handleUploadRequest(c: Context): Promise<Response> {
       : undefined;
   const upstreamError = extractUploadError(upstreamPayload);
 
-  if (!upstreamResponse.ok || (typeof upstreamStatus === "number" && upstreamStatus >= 300) || upstreamError) {
+  if (
+    !upstreamResponse.ok ||
+    (typeof upstreamStatus === "number" && upstreamStatus >= 300) ||
+    upstreamError
+  ) {
     console.error(
       "Image upload upstream returned error",
       upstreamResponse.status,
       upstreamResponse.statusText,
-      upstreamError,
+      upstreamError
     );
-    const status = (upstreamResponse.ok ? 502 : upstreamResponse.status) as StatusCode;
+    const status = (
+      upstreamResponse.ok ? 502 : upstreamResponse.status
+    ) as StatusCode;
     c.status(status);
-    return c.json({ error: upstreamError || "Upload was rejected by the image host." });
+    return c.json({
+      error: upstreamError || "Upload was rejected by the image host.",
+    });
   }
 
   const url = extractUploadUrl(upstreamPayload);
@@ -111,8 +128,12 @@ export async function handleUploadRequest(c: Context): Promise<Response> {
 
   const sanitized = sanitizeAttachmentInput(
     url,
-    mimeType.startsWith("video/") ? "video" : mimeType.startsWith("image/") ? "image" : extension,
-    fileEntry.name,
+    mimeType.startsWith("video/")
+      ? "video"
+      : mimeType.startsWith("image/")
+      ? "image"
+      : extension,
+    fileEntry.name
   );
   if (!sanitized) {
     console.error("Image upload URL failed sanitization", url);
@@ -122,6 +143,8 @@ export async function handleUploadRequest(c: Context): Promise<Response> {
   return c.json({
     url: sanitized.url,
     type: sanitized.type,
-    name: sanitized.name || (typeof fileEntry.name === "string" ? fileEntry.name : ""),
+    name:
+      sanitized.name ||
+      (typeof fileEntry.name === "string" ? fileEntry.name : ""),
   });
 }

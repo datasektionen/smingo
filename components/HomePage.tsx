@@ -46,7 +46,7 @@ const HomePage: FC<HomePageProps> = ({
       <header class="home-header">
         <div class="player-meta">
           <span>
-            Logged in as <strong>{userDisplayName}</strong>
+            Inloggad som <strong>{userDisplayName}</strong>
           </span>
         </div>
       </header>

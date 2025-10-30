@@ -298,20 +298,6 @@
       return wrapper;
     }
 
-    function isCheveretoUrl(url) {
-      if (typeof url !== "string" || !url) return false;
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== "https:") return false;
-        const host = parsed.hostname.toLowerCase();
-        return (
-          host === CHEVERETO_HOSTNAME || host.endsWith("." + CHEVERETO_HOSTNAME)
-        );
-      } catch (_) {
-        return false;
-      }
-    }
-
     function setAttachment(file) {
       pendingAttachment = file;
       if (chatAttachButton) {
@@ -371,9 +357,6 @@
 
       if (!url) {
         throw new Error("Upload completed without a usable URL");
-      }
-      if (!isCheveretoUrl(url)) {
-        throw new Error("Upload completed with an unexpected host");
       }
       const type =
         typeHint === "video"
@@ -630,7 +613,6 @@
         !entry.attachmentUrl
       )
         return null;
-      if (!isCheveretoUrl(entry.attachmentUrl)) return null;
       const type = entry.attachmentType === "video" ? "video" : "image";
       const wrapper = document.createElement("div");
       wrapper.className =
@@ -987,7 +969,7 @@
           file.size > ATTACHMENT_MAX_SIZE_BYTES
         ) {
           setStatus(
-            "Attachment is too large (" +
+            "Bilagan är för stor (" +
               formatFileSize(file.size) +
               "). Max " +
               formatFileSize(ATTACHMENT_MAX_SIZE_BYTES) +
@@ -998,7 +980,7 @@
           return;
         }
         setStatus(
-          "Uploading " + describeAttachment(file) + "…",
+          "Laddar upp " + describeAttachment(file) + "…",
           "upload",
           "info"
         );
@@ -1012,13 +994,13 @@
             uploaded.name ||
             (typeof file.name === "string" && file.name ? file.name : "");
           const displayName = attachmentName || describeAttachment(file);
-          setStatus("Attachment uploaded: " + displayName, "upload", "success");
+          setStatus("Bilaga uppladdad: " + displayName, "upload", "success");
         } catch (error) {
           const message =
             error && typeof error.message === "string" && error.message
               ? error.message
               : "Upload failed";
-          setStatus("Upload failed: " + message, "upload", "error");
+          setStatus("Uppladdning misslyckades: " + message, "upload", "error");
           return;
         } finally {
           setUploadingState(false);
@@ -1035,7 +1017,11 @@
       }
 
       if (!send(payload)) {
-        setStatus("Connection lost. Trying to reconnect…", "send", "error");
+        setStatus(
+          "Anslutning förlorad. Försöker att återansluta...",
+          "send",
+          "error"
+        );
         return;
       }
 
@@ -1098,11 +1084,6 @@
           return;
         }
         setAttachment(file);
-        setStatus(
-          "Attachment ready: " + describeAttachment(file),
-          "attachment",
-          "info"
-        );
         window.setTimeout(() => clearStatus("attachment"), 4000);
       });
     }
