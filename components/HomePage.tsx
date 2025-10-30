@@ -2,6 +2,14 @@ import type { FC } from "hono/jsx";
 import ChatPanel from "./ChatPanel.tsx";
 import type { UserProfile } from "../shared/types.ts";
 
+interface UserProfile {
+  kthId: string;
+  email: string;
+  firstName: string;
+  familyName: string;
+  yearTag: string;
+}
+
 interface HomePageProps {
   title: string;
   cells: readonly string[];
