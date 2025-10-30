@@ -8,7 +8,7 @@ import { setSignedCookie } from "hono/cookie";
 import Layout from "./components/Layout.tsx";
 import HomePage from "./components/HomePage.tsx";
 import AdminPage from "./components/AdminPage.tsx";
-import cards from "./cards.ts";
+import cards from "./cards-SM.ts";
 import { setupAdminSocket, setupPlayerSocket } from "./server/chat.ts";
 import { handleUploadRequest } from "./server/upload.ts";
 import { DEV_MODE, cookieSecret, loginRedirectUrl } from "./server/config.ts";
