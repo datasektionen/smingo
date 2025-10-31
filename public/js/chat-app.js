@@ -428,7 +428,7 @@
             const tooltip =
               tooltipNames.length === 1
                 ? prefix + " " + tooltipNames[0]
-                : prefix + "\\n" + tooltipNames.join("\\n");
+                : prefix + "\n" + tooltipNames.join("\n");
             btn.setAttribute("title", tooltip);
             btn.dataset.peerTooltip = "1";
           }
@@ -480,7 +480,10 @@
 
       const grid = document.createElement("div");
       grid.className = "board-toplist__grid";
-      grid.style.setProperty("grid-template-columns", `repeat(${size}, minmax(0, 1fr))`);
+      grid.style.setProperty(
+        "grid-template-columns",
+        `repeat(${size}, minmax(0, 1fr))`
+      );
 
       entry.board.forEach((cellValue, index) => {
         const cell = document.createElement("div");
@@ -548,7 +551,9 @@
         const stats = document.createElement("span");
         stats.className = "board-toplist__score";
         const statsLabel =
-          formatBingoLabel(entry.bingoCount) + " • " + formatBoxLabel(entry.boxCount);
+          formatBingoLabel(entry.bingoCount) +
+          " • " +
+          formatBoxLabel(entry.boxCount);
         stats.textContent = statsLabel;
 
         const chevron = document.createElement("span");
@@ -571,10 +576,19 @@
           toggle.addEventListener("click", () => {
             const expanded = toggle.getAttribute("aria-expanded") === "true";
             const nextExpanded = !expanded;
-            toggle.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
-            item.classList.toggle("board-toplist__item--expanded", nextExpanded);
+            toggle.setAttribute(
+              "aria-expanded",
+              nextExpanded ? "true" : "false"
+            );
+            item.classList.toggle(
+              "board-toplist__item--expanded",
+              nextExpanded
+            );
             boardPreview.hidden = !nextExpanded;
-            boardPreview.setAttribute("aria-hidden", nextExpanded ? "false" : "true");
+            boardPreview.setAttribute(
+              "aria-hidden",
+              nextExpanded ? "false" : "true"
+            );
             chevron.textContent = nextExpanded ? "▾" : "▸";
           });
         } else {
@@ -589,7 +603,8 @@
       if (boardToplistUpdated) {
         const timestamp = Number.isFinite(updatedAt) ? updatedAt : Date.now();
         const time = new Date(timestamp);
-        boardToplistUpdated.textContent = "Uppdaterad " + time.toLocaleTimeString();
+        boardToplistUpdated.textContent =
+          "Uppdaterad " + time.toLocaleTimeString();
       }
     }
 
@@ -708,14 +723,14 @@
     function formatChatMessageText(message) {
       const fragment = document.createDocumentFragment();
       let hasSelfPing = false;
-      const parts = message.match(/\\S+|\\s+/g) ?? [message];
-      const urlPattern = /^(https?:\/\/[^\\s]+?)([.,!?)]*)$/i;
+      const parts = message.match(/\S+|\s+/g) ?? [message];
+      const urlPattern = /^(https?:\/\/[^\s]+?)([.,!?)]*)$/i;
       const urls = [];
 
       for (const part of parts) {
         if (!part) continue;
         if (part.startsWith("@")) {
-          const match = part.match(/^@\\S*/);
+          const match = part.match(/^@\S*/);
           const mentionText = match ? match[0] : part;
           const remainder = match ? part.slice(mentionText.length) : "";
 
@@ -979,7 +994,7 @@
           : "";
       const attachmentName =
         typeof event.attachmentName === "string"
-          ? event.attachmentName.replace(/[\\r\\n]+/g, " ").slice(0, 120)
+          ? event.attachmentName.replace(/[\r\n]+/g, " ").slice(0, 120)
           : "";
       if (!trimmedMessage && !attachmentUrl) return;
 
@@ -1335,7 +1350,9 @@
               if (cell == null) return "";
               return String(cell);
             });
-            const clickedSource = Array.isArray(entry.clicked) ? entry.clicked : [];
+            const clickedSource = Array.isArray(entry.clicked)
+              ? entry.clicked
+              : [];
             const clickedSet = new Set();
             const clicked = [];
             clickedSource.forEach((value) => {
@@ -1346,7 +1363,14 @@
               }
             });
             clicked.sort((a, b) => a - b);
-            return { userId: displayName, kthId, bingoCount, boxCount, board, clicked };
+            return {
+              userId: displayName,
+              kthId,
+              bingoCount,
+              boxCount,
+              board,
+              clicked,
+            };
           })
           .filter(Boolean);
 
@@ -1357,7 +1381,8 @@
         });
 
         const updatedAt =
-          typeof payload.updatedAt === "number" && Number.isFinite(payload.updatedAt)
+          typeof payload.updatedAt === "number" &&
+          Number.isFinite(payload.updatedAt)
             ? payload.updatedAt
             : Date.now();
         renderLeaderboard(normalized, updatedAt);

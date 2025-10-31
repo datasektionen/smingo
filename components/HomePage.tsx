@@ -28,7 +28,7 @@ const HomePage: FC<HomePageProps> = ({
     localStorageIdent,
     cells,
     userProfile,
-  }).replace(/</g, "\\u003c");
+  }).replace(/</g, "\u003c");
   const boardNavScript = `
     (() => {
       const section = document.getElementById("boardSection");
@@ -71,7 +71,7 @@ const HomePage: FC<HomePageProps> = ({
         setActiveView(section.dataset.view);
       }
     })();
-  `.replace(/</g, "\\u003c");
+  `.replace(/</g, "\u003c");
   const boardNavItems: readonly BoardNavbarItem[] = [
     { id: "bingo", label: "Bräde" },
     { id: "toplist", label: "Topplista" },
