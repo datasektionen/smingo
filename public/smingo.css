@@ -36,6 +36,11 @@ body {
   box-sizing: border-box;
 }
 
+.dog {
+  margin-bottom: -6px;
+  margin-left: 4px;
+}
+
 .home-content {
   flex: 1;
   display: flex;
@@ -500,7 +505,8 @@ main.board-grid {
 }
 
 .talman-page__log-time {
-  font-family: "SFMono-Regular", ui-monospace, "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", monospace;
+  font-family: "SFMono-Regular", ui-monospace, "Menlo", "Monaco", "Consolas",
+    "Liberation Mono", "Courier New", monospace;
   font-size: 12px;
   color: #4b5563;
 }
