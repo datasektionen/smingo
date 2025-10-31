@@ -69,6 +69,35 @@ app.get("/assets/admin-app.js", () =>
   }),
 );
 
+// Serve media files (like SMingo.mp3)
+app.get("/media/:filename", async (c: Context) => {
+  const filename = c.req.param("filename");
+  try {
+    const filePath = new URL(`./media/${filename}`, import.meta.url);
+    const file = await Deno.readFile(filePath);
+    
+    // Determine content type based on file extension
+    let contentType = "application/octet-stream";
+    if (filename.endsWith(".mp3")) {
+      contentType = "audio/mpeg";
+    } else if (filename.endsWith(".wav")) {
+      contentType = "audio/wav";
+    } else if (filename.endsWith(".ogg")) {
+      contentType = "audio/ogg";
+    }
+    
+    return new Response(file, {
+      headers: {
+        "content-type": contentType,
+        "cache-control": DEV_MODE ? "no-store" : "public, max-age=3600",
+      },
+    });
+  } catch (error) {
+    console.error(`Failed to serve media file ${filename}:`, error);
+    return new Response("File not found", { status: 404 });
+  }
+});
+
 app.get("/callback/:code", async (c: Context) => {
   const code = c.req.param("code");
   const result = await verifyLegacyLogin(code);
