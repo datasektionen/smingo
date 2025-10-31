@@ -8,10 +8,11 @@ import { setSignedCookie } from "hono/cookie";
 import Layout from "./components/Layout.tsx";
 import HomePage from "./components/HomePage.tsx";
 import AdminPage from "./components/AdminPage.tsx";
+import TalmanPage from "./components/TalmanPage.tsx";
 import cards from "./cards-SM.ts";
 import { setupAdminSocket, setupPlayerSocket } from "./server/chat.ts";
 import { handleUploadRequest } from "./server/upload.ts";
-import { DEV_MODE, cookieSecret, loginRedirectUrl } from "./server/config.ts";
+import { cookieSecret, DEV_MODE, loginRedirectUrl } from "./server/config.ts";
 import {
   ensureAdminSession,
   ensurePlayerSession,
@@ -20,10 +21,21 @@ import {
 } from "./server/auth.ts";
 import { createSeededRandom } from "./server/random.ts";
 
-const smingoCss = Deno.readTextFileSync(new URL("./public/smingo.css", import.meta.url));
-const smingoJs = Deno.readTextFileSync(new URL("./public/smingo.js", import.meta.url));
-const chatAppJs = Deno.readTextFileSync(new URL("./public/js/chat-app.js", import.meta.url));
-const adminAppJs = Deno.readTextFileSync(new URL("./public/js/admin-app.js", import.meta.url));
+const smingoCss = Deno.readTextFileSync(
+  new URL("./public/smingo.css", import.meta.url),
+);
+const smingoJs = Deno.readTextFileSync(
+  new URL("./public/smingo.js", import.meta.url),
+);
+const chatAppJs = Deno.readTextFileSync(
+  new URL("./public/js/chat-app.js", import.meta.url),
+);
+const adminAppJs = Deno.readTextFileSync(
+  new URL("./public/js/admin-app.js", import.meta.url),
+);
+const talmanAppJs = Deno.readTextFileSync(
+  new URL("./public/js/talman-app.js", import.meta.url),
+);
 
 const app = new Hono();
 
@@ -39,8 +51,7 @@ app.get("/assets/smingo.css", () =>
       "content-type": "text/css; charset=utf-8",
       "cache-control": DEV_MODE ? "no-store" : "public, max-age=300",
     },
-  }),
-);
+  }));
 
 app.get("/assets/smingo.js", () =>
   new Response(smingoJs, {
@@ -48,8 +59,7 @@ app.get("/assets/smingo.js", () =>
       "content-type": "text/javascript; charset=utf-8",
       "cache-control": DEV_MODE ? "no-store" : "public, max-age=300",
     },
-  }),
-);
+  }));
 
 app.get("/assets/chat-app.js", () =>
   new Response(chatAppJs, {
@@ -57,8 +67,7 @@ app.get("/assets/chat-app.js", () =>
       "content-type": "text/javascript; charset=utf-8",
       "cache-control": DEV_MODE ? "no-store" : "public, max-age=300",
     },
-  }),
-);
+  }));
 
 app.get("/assets/admin-app.js", () =>
   new Response(adminAppJs, {
@@ -66,16 +75,22 @@ app.get("/assets/admin-app.js", () =>
       "content-type": "text/javascript; charset=utf-8",
       "cache-control": DEV_MODE ? "no-store" : "public, max-age=300",
     },
-  }),
-);
+  }));
 
+app.get("/assets/talman-app.js", () =>
+  new Response(talmanAppJs, {
+    headers: {
+      "content-type": "text/javascript; charset=utf-8",
+      "cache-control": DEV_MODE ? "no-store" : "public, max-age=300",
+    },
+  }));
 // Serve media files (like SMingo.mp3)
 app.get("/media/:filename", async (c: Context) => {
   const filename = c.req.param("filename");
   try {
     const filePath = new URL(`./media/${filename}`, import.meta.url);
     const file = await Deno.readFile(filePath);
-    
+
     // Determine content type based on file extension
     let contentType = "application/octet-stream";
     if (filename.endsWith(".mp3")) {
@@ -85,7 +100,7 @@ app.get("/media/:filename", async (c: Context) => {
     } else if (filename.endsWith(".ogg")) {
       contentType = "audio/ogg";
     }
-    
+
     return new Response(file, {
       headers: {
         "content-type": contentType,
@@ -128,7 +143,9 @@ app.get("/", async (c: Context) => {
   const stuff: string[] = [];
   let seed = 0;
   for (const ch of userKthId) seed = seed * 256 + ch.charCodeAt(0);
-  for (const ch of new Date().toDateString()) seed = seed * 256 + ch.charCodeAt(0);
+  for (const ch of new Date().toDateString()) {
+    seed = seed * 256 + ch.charCodeAt(0);
+  }
 
   const rand = createSeededRandom(seed);
   while (stuff.length < 25) {
@@ -158,6 +175,17 @@ app.get("/admin", async (c: Context) => {
   return c.html(
     <Layout>
       <AdminPage />
+    </Layout>,
+  );
+});
+
+app.get("/talman", async (c: Context) => {
+  const session = await ensurePlayerSession(c);
+  if (session instanceof Response) return session;
+
+  return c.html(
+    <Layout>
+      <TalmanPage />
     </Layout>,
   );
 });

@@ -393,6 +393,15 @@ export function setupPlayerSocket(ws: WebSocket) {
           categories: ["bingo"],
         };
         broadcastChatMessage(chatPayload);
+        const smingoPayload = JSON.stringify({
+          type: "smingo",
+          userId: session.userId,
+          kthId: session.kthId,
+          bingoCount: session.bingoCount,
+          previousBingoCount,
+          timestamp: Date.now(),
+        });
+        broadcastToPlayers(smingoPayload);
       }
     } else if (type === "chat") {
       if (!session) return;
