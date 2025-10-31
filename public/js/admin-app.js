@@ -5,7 +5,9 @@
     const detailEl = document.getElementById("adminDetail");
     const searchInput = document.getElementById("adminSearch");
     const sortSelect = document.getElementById("adminSort");
-    const socketUrl = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/ws?role=admin";
+    const socketUrl =
+      (window.location.protocol === "https:" ? "wss://" : "ws://") +
+      window.location.host + "/ws?role=admin";
     let socket = null;
     let reconnectTimer = null;
 
@@ -15,6 +17,7 @@
       selectedId: null,
       searchTerm: "",
       sortMode: sortSelect ? sortSelect.value : "name",
+      pending: new Map(),
     };
 
     let connectionState = "Connecting…";
@@ -49,8 +52,11 @@
         default:
           sortLabel = "sorted alphabetically";
       }
-      const filterText = visible === total ? `${visible} ${label}` : `${visible} of ${total} ${label}`;
-      statusEl.textContent = `${connectionState} • ${filterText} • ${sortLabel}`;
+      const filterText = visible === total
+        ? `${visible} ${label}`
+        : `${visible} of ${total} ${label}`;
+      statusEl.textContent =
+        `${connectionState} • ${filterText} • ${sortLabel}`;
     }
 
     function formatTime(value) {
@@ -73,6 +79,42 @@
       return `${days}d ago`;
     }
 
+    function computeBingoCount(boardLength, clicked) {
+      if (!Number.isFinite(boardLength) || boardLength <= 0) return 0;
+      const size = Math.sqrt(boardLength);
+      if (!Number.isInteger(size) || size <= 0) return 0;
+      const clickedSet = new Set(clicked);
+      let count = 0;
+      for (let r = 0; r < size; r++) {
+        let rowComplete = true;
+        let colComplete = true;
+        for (let c = 0; c < size; c++) {
+          if (!clickedSet.has(r * size + c)) {
+            rowComplete = false;
+          }
+          if (!clickedSet.has(c * size + r)) {
+            colComplete = false;
+          }
+          if (!rowComplete && !colComplete) break;
+        }
+        if (rowComplete) count++;
+        if (colComplete) count++;
+      }
+      let diag1Complete = true;
+      let diag2Complete = true;
+      for (let i = 0; i < size; i++) {
+        if (!clickedSet.has(i * size + i)) {
+          diag1Complete = false;
+        }
+        if (!clickedSet.has(i * size + (size - 1 - i))) {
+          diag2Complete = false;
+        }
+      }
+      if (diag1Complete) count++;
+      if (diag2Complete) count++;
+      return count;
+    }
+
     function normalizePlayers(list) {
       if (!Array.isArray(list)) return [];
       return list
@@ -83,18 +125,28 @@
             : [];
           const clicked = Array.isArray(player.clicked)
             ? player.clicked
-                .map((n) => (typeof n === "number" ? n : Number(n)))
-                .filter((n) => Number.isInteger(n) && n >= 0 && n < board.length)
+              .map((n) => (typeof n === "number" ? n : Number(n)))
+              .filter((n) => Number.isInteger(n) && n >= 0 && n < board.length)
             : [];
-          const id = typeof player.id === "string" ? player.id : String(player.id ?? "");
+          const id = typeof player.id === "string"
+            ? player.id
+            : String(player.id ?? "");
           return {
             id,
-            userId: typeof player.userId === "string" && player.userId ? player.userId : "Unknown user",
+            userId: typeof player.userId === "string" && player.userId
+              ? player.userId
+              : "Unknown user",
             board,
             clicked,
-            connectedAt: typeof player.connectedAt === "number" ? player.connectedAt : 0,
-            lastUpdate: typeof player.lastUpdate === "number" ? player.lastUpdate : 0,
-            bingoCount: typeof player.bingoCount === "number" ? player.bingoCount : 0,
+            connectedAt: typeof player.connectedAt === "number"
+              ? player.connectedAt
+              : 0,
+            lastUpdate: typeof player.lastUpdate === "number"
+              ? player.lastUpdate
+              : 0,
+            bingoCount: typeof player.bingoCount === "number"
+              ? player.bingoCount
+              : 0,
           };
         })
         .filter(Boolean);
@@ -104,20 +156,28 @@
       const term = state.searchTerm.trim().toLowerCase();
       let filtered = state.players.slice();
       if (term) {
-        filtered = filtered.filter((player) => player.userId.toLowerCase().includes(term));
+        filtered = filtered.filter((player) =>
+          player.userId.toLowerCase().includes(term)
+        );
       }
 
       switch (state.sortMode) {
         case "bingo":
           filtered.sort((a, b) => {
-            if (b.bingoCount !== a.bingoCount) return b.bingoCount - a.bingoCount;
-            if (b.lastUpdate !== a.lastUpdate) return b.lastUpdate - a.lastUpdate;
+            if (b.bingoCount !== a.bingoCount) {
+              return b.bingoCount - a.bingoCount;
+            }
+            if (b.lastUpdate !== a.lastUpdate) {
+              return b.lastUpdate - a.lastUpdate;
+            }
             return a.userId.localeCompare(b.userId);
           });
           break;
         case "updated":
           filtered.sort((a, b) => {
-            if (b.lastUpdate !== a.lastUpdate) return b.lastUpdate - a.lastUpdate;
+            if (b.lastUpdate !== a.lastUpdate) {
+              return b.lastUpdate - a.lastUpdate;
+            }
             return a.userId.localeCompare(b.userId);
           });
           break;
@@ -131,13 +191,60 @@
       }
 
       state.filtered = filtered;
-      if (!state.selectedId || !filtered.some((player) => player.id === state.selectedId)) {
+      if (
+        !state.selectedId ||
+        !filtered.some((player) => player.id === state.selectedId)
+      ) {
         state.selectedId = filtered.length ? filtered[0].id : null;
       }
 
       renderList();
       renderDetail();
       updateStatus();
+    }
+
+    function togglePlayerCell(playerId, cellIndex) {
+      if (!playerId || !Number.isInteger(cellIndex)) return;
+      const player = state.players.find((item) => item.id === playerId);
+      if (!player) return;
+      if (
+        !Array.isArray(player.board) ||
+        cellIndex < 0 ||
+        cellIndex >= player.board.length
+      ) {
+        return;
+      }
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        setConnectionState("Disconnected");
+        return;
+      }
+      const clickedSet = new Set(player.clicked);
+      const shouldCheck = !clickedSet.has(cellIndex);
+      const payload = {
+        type: "adminUpdate",
+        action: "setCell",
+        playerId,
+        cell: cellIndex,
+        checked: shouldCheck,
+      };
+      try {
+        socket.send(JSON.stringify(payload));
+      } catch (error) {
+        console.error("Failed to send admin update", error);
+        return;
+      }
+      const key = playerId + ":" + cellIndex;
+      state.pending.set(key, shouldCheck);
+      if (shouldCheck) {
+        clickedSet.add(cellIndex);
+      } else {
+        clickedSet.delete(cellIndex);
+      }
+      const updated = Array.from(clickedSet).sort((a, b) => a - b);
+      player.clicked = updated;
+      player.bingoCount = computeBingoCount(player.board.length, updated);
+      player.lastUpdate = Date.now();
+      applyFilters();
     }
 
     function renderList() {
@@ -161,7 +268,8 @@
         btn.type = "button";
         btn.dataset.id = player.id;
         btn.id = player.id;
-        btn.className = "admin-user" + (player.id === state.selectedId ? " selected" : "");
+        btn.className = "admin-user" +
+          (player.id === state.selectedId ? " selected" : "");
         btn.setAttribute("role", "option");
 
         const name = document.createElement("span");
@@ -170,7 +278,9 @@
 
         const bingo = document.createElement("span");
         bingo.className = "admin-user__bingo";
-        bingo.textContent = `${player.bingoCount} bingo${player.bingoCount === 1 ? "" : "s"}`;
+        bingo.textContent = `${player.bingoCount} bingo${
+          player.bingoCount === 1 ? "" : "s"
+        }`;
 
         const updated = document.createElement("span");
         updated.className = "admin-user__meta";
@@ -227,17 +337,23 @@
 
       const badge = document.createElement("span");
       badge.className = "admin-bingo";
-      badge.textContent = `${player.bingoCount} bingo${player.bingoCount === 1 ? "" : "s"}`;
+      badge.textContent = `${player.bingoCount} bingo${
+        player.bingoCount === 1 ? "" : "s"
+      }`;
 
       titleRow.append(title, badge);
 
       const meta = document.createElement("p");
       meta.className = "admin-card__meta";
-      meta.textContent = `Connected ${formatTime(player.connectedAt)} • Updated ${formatTime(player.lastUpdate)}`;
+      meta.textContent = `Connected ${
+        formatTime(player.connectedAt)
+      } • Updated ${formatTime(player.lastUpdate)}`;
 
       const metaSecondary = document.createElement("p");
       metaSecondary.className = "admin-card__meta--secondary";
-      metaSecondary.textContent = player.lastUpdate ? `(${formatRelative(player.lastUpdate)})` : "";
+      metaSecondary.textContent = player.lastUpdate
+        ? `(${formatRelative(player.lastUpdate)})`
+        : "";
 
       header.append(titleRow, meta);
       if (player.lastUpdate) {
@@ -255,10 +371,28 @@
         grid.className = "admin-grid";
         const clickedSet = new Set(player.clicked);
         player.board.forEach((cellText, idx) => {
-          const cell = document.createElement("div");
-          cell.className = "admin-cell" + (clickedSet.has(idx) ? " checked" : "");
+          const key = player.id + ":" + idx;
+          const cell = document.createElement("button");
+          cell.type = "button";
+          const isChecked = clickedSet.has(idx);
+          cell.className = "admin-cell" + (isChecked ? " checked" : "");
           cell.textContent = String(cellText);
+          cell.dataset.index = String(idx);
+          cell.setAttribute("aria-pressed", isChecked ? "true" : "false");
+          if (state.pending.has(key)) {
+            cell.dataset.pending = "true";
+            cell.disabled = true;
+          }
           grid.appendChild(cell);
+        });
+        grid.addEventListener("click", (event) => {
+          const target = event.target instanceof Element
+            ? event.target.closest("button.admin-cell")
+            : null;
+          if (!target || target.disabled || !target.dataset.index) return;
+          const index = Number(target.dataset.index);
+          if (!Number.isInteger(index)) return;
+          togglePlayerCell(player.id, index);
         });
         card.appendChild(grid);
       }
@@ -270,7 +404,27 @@
       try {
         const data = JSON.parse(event.data);
         if (data && data.type === "active") {
-          state.players = normalizePlayers(data.players);
+          const normalized = normalizePlayers(data.players);
+          if (state.pending.size) {
+            for (const [key, expected] of [...state.pending.entries()]) {
+              const [playerId, cellRaw] = key.split(":");
+              const cellIndex = Number(cellRaw);
+              if (!playerId || !Number.isInteger(cellIndex)) {
+                state.pending.delete(key);
+                continue;
+              }
+              const player = normalized.find((item) => item.id === playerId);
+              if (!player) {
+                state.pending.delete(key);
+                continue;
+              }
+              const isChecked = player.clicked.includes(cellIndex);
+              if (isChecked === expected) {
+                state.pending.delete(key);
+              }
+            }
+          }
+          state.players = normalized;
           applyFilters();
           setBusy(false);
         }
@@ -289,6 +443,7 @@
       state.players = [];
       state.filtered = [];
       state.selectedId = null;
+      state.pending.clear();
       if (detailEl) {
         detailEl.innerHTML = "";
         const placeholder = document.createElement("p");
@@ -330,7 +485,9 @@
 
     if (listEl) {
       listEl.addEventListener("click", (event) => {
-        const target = event.target instanceof Element ? event.target.closest("button.admin-user") : null;
+        const target = event.target instanceof Element
+          ? event.target.closest("button.admin-user")
+          : null;
         if (!target || !target.dataset.id) return;
         if (state.selectedId === target.dataset.id) return;
         state.selectedId = target.dataset.id;
