@@ -44,6 +44,79 @@
     return done;
   }
 
+  function playSmingoSound(mult) {
+    try {
+      // Create audio context for advanced audio manipulation
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      
+      // Load and play the SMingo.mp3 file
+      fetch('/media/SMingo.mp3')
+        .then(response => response.arrayBuffer())
+        .then(data => audioContext.decodeAudioData(data))
+        .then(audioBuffer => {
+          const source = audioContext.createBufferSource();
+          source.buffer = audioBuffer;
+          
+          // Create gain node for volume control
+          const gainNode = audioContext.createGain();
+          
+          // Create distortion effect using wave shaper
+          const distortion = audioContext.createWaveShaper();
+          const samples = 44100;
+          const curve = new Float32Array(samples);
+          
+          // Start with some distortion even for 1x, then scale aggressively
+          const baseDistortion = 8; // Reduced base distortion for 1x SMingo
+          const distortionAmount = mult === 1 ? baseDistortion : Math.min(180, baseDistortion + 18 * Math.pow(mult - 1, 1.8));
+          
+          // Generate aggressive distortion curve
+          for (let i = 0; i < samples; i++) {
+            const x = (i * 2) / samples - 1;
+            // Always apply some distortion, but scale it up dramatically
+            const drive = 1 + distortionAmount * 0.06; // Reduced drive multiplier
+            const distorted = Math.tanh(x * drive * 2.2); // Slightly reduced drive factor
+            const clipped = Math.max(-1, Math.min(1, distorted * (1 + distortionAmount * 0.02)));
+            curve[i] = clipped;
+          }
+          distortion.curve = curve;
+          distortion.oversample = '4x';
+          
+          // Much louder base volume and more aggressive scaling
+          const baseVolume = 0.95; // Much louder from the beginning
+          const volumeBoost = Math.min(2.2, 1 + 0.4 * (mult - 1)); // Even more aggressive volume scaling
+          gainNode.gain.setValueAtTime(baseVolume * volumeBoost, audioContext.currentTime);
+          
+          // Add high-frequency boost that starts from 1x
+          const filter = audioContext.createBiquadFilter();
+          filter.type = 'highshelf';
+          filter.frequency.setValueAtTime(2000, audioContext.currentTime);
+          filter.gain.setValueAtTime(Math.min(15, 1 + 3 * (mult - 1)), audioContext.currentTime);
+          
+          // Always use the distorted path now
+          source.connect(distortion);
+          distortion.connect(filter);
+          filter.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          // Play the sound
+          source.start(0);
+        })
+        .catch(error => {
+          console.warn('Could not play SMingo sound:', error);
+          // Fallback to simple audio element if Web Audio API fails
+          const audio = new Audio('/media/SMingo.mp3');
+          audio.volume = Math.min(1, 0.95 * Math.min(2.2, 1 + 0.4 * (mult - 1)));
+          audio.play().catch(e => console.warn('Audio playback failed:', e));
+        });
+    } catch (error) {
+      console.warn('Audio context not supported, using fallback:', error);
+      // Simple fallback for browsers without Web Audio API support
+      const audio = new Audio('/media/SMingo.mp3');
+      audio.volume = Math.min(1, 0.95 * Math.min(2.2, 1 + 0.4 * (mult - 1)));
+      audio.play().catch(e => console.warn('Audio playback failed:', e));
+    }
+  }
+
   function launchConfetti(mult) {
     if (typeof confetti !== 'function') return;
 
@@ -90,6 +163,7 @@
     hideTimer = setTimeout(hideSmingo, 10000);
 
     launchConfetti(mult);
+    playSmingoSound(mult); // Play the SMingo sound with distortion
   }
 
   function hideSmingo() {
