@@ -6,7 +6,6 @@ export interface SanitizedAttachment {
   name: string;
 }
 
-export const ATTACHMENT_HOSTNAME = "imgcdn.dev";
 export const ATTACHMENT_ALLOWED_MIME_PREFIXES = ["image/", "video/"];
 export const ATTACHMENT_IMAGE_EXTENSIONS = new Set([
   "jpg",
@@ -32,8 +31,8 @@ export const ATTACHMENT_VIDEO_EXTENSIONS = new Set([
   "gifv",
 ]);
 export const ATTACHMENT_MAX_SIZE_BYTES = 25 * 1024 * 1024;
-export const IMAGE_UPLOAD_ENDPOINT = "https://imgcdn.dev/api/1/upload";
-export const IMAGE_UPLOAD_KEY = "5386e05a3562c7a8f984e73401540836";
+export const IMAGE_UPLOAD_ENDPOINT = "https://api.imgbb.com/1/upload";
+export const IMAGE_UPLOAD_KEY = "b70958c5e3ef5bebb4d300c8d8b2ae25";
 
 export function getFileExtension(path: string): string {
   const lastDot = path.lastIndexOf(".");
@@ -46,7 +45,7 @@ export function getFileExtension(path: string): string {
 export function sanitizeAttachmentInput(
   urlValue: unknown,
   typeValue: unknown,
-  nameValue: unknown,
+  nameValue: unknown
 ): SanitizedAttachment | null {
   if (typeof urlValue !== "string") return null;
   const trimmedUrl = urlValue.trim();
@@ -60,10 +59,6 @@ export function sanitizeAttachmentInput(
   }
 
   if (parsed.protocol !== "https:") return null;
-  const host = parsed.hostname.toLowerCase();
-  if (host !== ATTACHMENT_HOSTNAME && !host.endsWith(`.${ATTACHMENT_HOSTNAME}`)) {
-    return null;
-  }
 
   const cleanUrl = parsed.toString();
   let type: AttachmentType;
@@ -131,17 +126,15 @@ export function extractUploadError(payload: unknown): string {
   if (typeof record.error === "string" && record.error) {
     return record.error;
   }
-  if (record.error && typeof record.error === "object" && record.error !== null) {
+  if (
+    record.error &&
+    typeof record.error === "object" &&
+    record.error !== null
+  ) {
     const nested = record.error as Record<string, unknown>;
     if (typeof nested.message === "string" && nested.message) {
       return nested.message;
     }
-  }
-  if (typeof record.message === "string" && record.message) {
-    return record.message;
-  }
-  if (typeof record.status_txt === "string" && record.status_txt) {
-    return record.status_txt;
   }
   return "";
 }

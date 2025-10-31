@@ -9,6 +9,7 @@ COPY components ./components
 COPY public ./public
 COPY server ./server
 COPY shared ./shared
+COPY media ./media
 
 RUN deno cache main.tsx
 

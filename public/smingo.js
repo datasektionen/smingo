@@ -208,4 +208,6 @@
 
   // Initial check (celebrates any existing lines on load)
   window.addEventListener('DOMContentLoaded', () => setTimeout(window.checkBingo, 0));
+
+  window.smingoPlaySound = playSmingoSound;
 })();

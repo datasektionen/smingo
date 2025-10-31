@@ -42,6 +42,11 @@
     let highlightFrame = null;
     let highlightLastTick = null;
     const peerSelections = new Map();
+    const leaderboardState = { entries: [], updatedAt: 0 };
+    const boardToplistSection = document.getElementById("board-view-toplist");
+    const boardToplistList = document.getElementById("boardToplistList");
+    const boardToplistEmpty = document.getElementById("boardToplistEmpty");
+    const boardToplistUpdated = document.getElementById("boardToplistUpdated");
     const ownKthId =
       config.userProfile && typeof config.userProfile.kthId === "string"
         ? config.userProfile.kthId
@@ -298,20 +303,6 @@
       return wrapper;
     }
 
-    function isCheveretoUrl(url) {
-      if (typeof url !== "string" || !url) return false;
-      try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== "https:") return false;
-        const host = parsed.hostname.toLowerCase();
-        return (
-          host === CHEVERETO_HOSTNAME || host.endsWith("." + CHEVERETO_HOSTNAME)
-        );
-      } catch (_) {
-        return false;
-      }
-    }
-
     function setAttachment(file) {
       pendingAttachment = file;
       if (chatAttachButton) {
@@ -371,9 +362,6 @@
 
       if (!url) {
         throw new Error("Upload completed without a usable URL");
-      }
-      if (!isCheveretoUrl(url)) {
-        throw new Error("Upload completed with an unexpected host");
       }
       const type =
         typeHint === "video"
@@ -454,6 +442,155 @@
           }
         }
       });
+    }
+
+    function formatBingoLabel(count) {
+      const value = Number.isFinite(count) ? count : 0;
+      return value + " " + (value === 1 ? "bingo" : "bingon");
+    }
+
+    function formatBoxLabel(count) {
+      const value = Number.isFinite(count) ? count : 0;
+      return value + " " + (value === 1 ? "ruta" : "rutor");
+    }
+
+    function createLeaderboardBoard(entry) {
+      if (!entry || !Array.isArray(entry.board) || entry.board.length === 0) {
+        return null;
+      }
+      const length = entry.board.length;
+      const size = Math.sqrt(length);
+      if (!Number.isInteger(size) || size <= 0) {
+        return null;
+      }
+
+      const clicked = new Set();
+      if (Array.isArray(entry.clicked)) {
+        entry.clicked.forEach((value) => {
+          const num = typeof value === "number" ? value : Number(value);
+          if (Number.isInteger(num) && num >= 0 && num < length) {
+            clicked.add(num);
+          }
+        });
+      }
+
+      const container = document.createElement("div");
+      container.className = "board-toplist__board";
+      container.setAttribute("aria-hidden", "true");
+
+      const grid = document.createElement("div");
+      grid.className = "board-toplist__grid";
+      grid.style.setProperty("grid-template-columns", `repeat(${size}, minmax(0, 1fr))`);
+
+      entry.board.forEach((cellValue, index) => {
+        const cell = document.createElement("div");
+        cell.className = "board-toplist__cell";
+        if (clicked.has(index)) {
+          cell.classList.add("board-toplist__cell--checked");
+        }
+        cell.textContent =
+          typeof cellValue === "string"
+            ? cellValue
+            : cellValue == null
+            ? ""
+            : String(cellValue);
+        grid.appendChild(cell);
+      });
+
+      container.appendChild(grid);
+      return container;
+    }
+
+    function renderLeaderboard(entries, updatedAt) {
+      if (!boardToplistList) return;
+      leaderboardState.entries = entries.slice();
+      leaderboardState.updatedAt = updatedAt || Date.now();
+
+      boardToplistList.innerHTML = "";
+      if (!entries.length) {
+        if (boardToplistEmpty) {
+          boardToplistEmpty.removeAttribute("hidden");
+        }
+        if (boardToplistUpdated) {
+          boardToplistUpdated.textContent = "";
+        }
+        return;
+      }
+
+      if (boardToplistEmpty) {
+        boardToplistEmpty.setAttribute("hidden", "true");
+      }
+
+      const fragment = document.createDocumentFragment();
+      entries.forEach((entry, index) => {
+        const item = document.createElement("li");
+        item.className = "board-toplist__item";
+        if (entry.kthId && entry.kthId === ownKthId) {
+          item.classList.add("board-toplist__item--self");
+        }
+
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "board-toplist__toggle";
+        toggle.setAttribute("aria-expanded", "false");
+
+        const rank = document.createElement("span");
+        rank.className = "board-toplist__rank";
+        rank.textContent = String(index + 1);
+
+        const name = document.createElement("span");
+        name.className = "board-toplist__name";
+        name.textContent = entry.userId;
+        if (entry.kthId) {
+          name.title = entry.kthId;
+        }
+
+        const stats = document.createElement("span");
+        stats.className = "board-toplist__score";
+        const statsLabel =
+          formatBingoLabel(entry.bingoCount) + " • " + formatBoxLabel(entry.boxCount);
+        stats.textContent = statsLabel;
+
+        const chevron = document.createElement("span");
+        chevron.className = "board-toplist__chevron";
+        chevron.setAttribute("aria-hidden", "true");
+        chevron.textContent = "▸";
+        stats.appendChild(chevron);
+
+        toggle.append(rank, name, stats);
+        item.appendChild(toggle);
+
+        const boardPreview = createLeaderboardBoard(entry);
+        if (boardPreview) {
+          const boardId = "boardToplistPlayer-" + index;
+          boardPreview.id = boardId;
+          toggle.setAttribute("aria-controls", boardId);
+          boardPreview.hidden = true;
+          item.appendChild(boardPreview);
+
+          toggle.addEventListener("click", () => {
+            const expanded = toggle.getAttribute("aria-expanded") === "true";
+            const nextExpanded = !expanded;
+            toggle.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
+            item.classList.toggle("board-toplist__item--expanded", nextExpanded);
+            boardPreview.hidden = !nextExpanded;
+            boardPreview.setAttribute("aria-hidden", nextExpanded ? "false" : "true");
+            chevron.textContent = nextExpanded ? "▾" : "▸";
+          });
+        } else {
+          chevron.textContent = "";
+          toggle.disabled = true;
+        }
+
+        fragment.appendChild(item);
+      });
+
+      boardToplistList.appendChild(fragment);
+      if (boardToplistUpdated) {
+        const timestamp = Number.isFinite(updatedAt) ? updatedAt : Date.now();
+        const time = new Date(timestamp);
+        boardToplistUpdated.textContent = "Uppdaterad " + time.toLocaleTimeString();
+      }
     }
 
     function ensureHighlightLoop() {
@@ -630,7 +767,6 @@
         !entry.attachmentUrl
       )
         return null;
-      if (!isCheveretoUrl(entry.attachmentUrl)) return null;
       const type = entry.attachmentType === "video" ? "video" : "image";
       const wrapper = document.createElement("div");
       wrapper.className =
@@ -987,7 +1123,7 @@
           file.size > ATTACHMENT_MAX_SIZE_BYTES
         ) {
           setStatus(
-            "Attachment is too large (" +
+            "Bilagan är för stor (" +
               formatFileSize(file.size) +
               "). Max " +
               formatFileSize(ATTACHMENT_MAX_SIZE_BYTES) +
@@ -998,7 +1134,7 @@
           return;
         }
         setStatus(
-          "Uploading " + describeAttachment(file) + "…",
+          "Laddar upp " + describeAttachment(file) + "…",
           "upload",
           "info"
         );
@@ -1012,13 +1148,13 @@
             uploaded.name ||
             (typeof file.name === "string" && file.name ? file.name : "");
           const displayName = attachmentName || describeAttachment(file);
-          setStatus("Attachment uploaded: " + displayName, "upload", "success");
+          setStatus("Bilaga uppladdad: " + displayName, "upload", "success");
         } catch (error) {
           const message =
             error && typeof error.message === "string" && error.message
               ? error.message
               : "Upload failed";
-          setStatus("Upload failed: " + message, "upload", "error");
+          setStatus("Uppladdning misslyckades: " + message, "upload", "error");
           return;
         } finally {
           setUploadingState(false);
@@ -1035,7 +1171,11 @@
       }
 
       if (!send(payload)) {
-        setStatus("Connection lost. Trying to reconnect…", "send", "error");
+        setStatus(
+          "Anslutning förlorad. Försöker att återansluta...",
+          "send",
+          "error"
+        );
         return;
       }
 
@@ -1098,11 +1238,6 @@
           return;
         }
         setAttachment(file);
-        setStatus(
-          "Attachment ready: " + describeAttachment(file),
-          "attachment",
-          "info"
-        );
         window.setTimeout(() => clearStatus("attachment"), 4000);
       });
     }
@@ -1168,6 +1303,64 @@
           });
         }
         updatePeerIndicators();
+      } else if (payload.type === "leaderboard") {
+        const list = Array.isArray(payload.players) ? payload.players : [];
+        const normalized = list
+          .map((entry) => {
+            if (!entry || typeof entry !== "object") return null;
+            const displayName =
+              typeof entry.userId === "string" && entry.userId.trim()
+                ? entry.userId.trim()
+                : typeof entry.kthId === "string" && entry.kthId.trim()
+                ? entry.kthId.trim()
+                : "";
+            if (!displayName) return null;
+            const kthId =
+              typeof entry.kthId === "string" && entry.kthId.trim()
+                ? entry.kthId.trim()
+                : "";
+            const bingoRaw =
+              typeof entry.bingoCount === "number"
+                ? entry.bingoCount
+                : Number(entry.bingoCount);
+            const boxRaw =
+              typeof entry.boxCount === "number"
+                ? entry.boxCount
+                : Number(entry.boxCount);
+            const bingoCount = Number.isFinite(bingoRaw) ? bingoRaw : 0;
+            const boxCount = Number.isFinite(boxRaw) ? boxRaw : 0;
+            const boardSource = Array.isArray(entry.board) ? entry.board : [];
+            const board = boardSource.map((cell) => {
+              if (typeof cell === "string") return cell;
+              if (cell == null) return "";
+              return String(cell);
+            });
+            const clickedSource = Array.isArray(entry.clicked) ? entry.clicked : [];
+            const clickedSet = new Set();
+            const clicked = [];
+            clickedSource.forEach((value) => {
+              const num = typeof value === "number" ? value : Number(value);
+              if (Number.isInteger(num) && num >= 0 && !clickedSet.has(num)) {
+                clickedSet.add(num);
+                clicked.push(num);
+              }
+            });
+            clicked.sort((a, b) => a - b);
+            return { userId: displayName, kthId, bingoCount, boxCount, board, clicked };
+          })
+          .filter(Boolean);
+
+        normalized.sort((a, b) => {
+          if (b.bingoCount !== a.bingoCount) return b.bingoCount - a.bingoCount;
+          if (b.boxCount !== a.boxCount) return b.boxCount - a.boxCount;
+          return a.userId.localeCompare(b.userId);
+        });
+
+        const updatedAt =
+          typeof payload.updatedAt === "number" && Number.isFinite(payload.updatedAt)
+            ? payload.updatedAt
+            : Date.now();
+        renderLeaderboard(normalized, updatedAt);
       }
     }
 
