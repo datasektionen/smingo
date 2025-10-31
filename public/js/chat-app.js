@@ -886,6 +886,55 @@
       }
     }
 
+    function escapeSelector(value) {
+      if (typeof value !== "string") return "";
+      if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+        return CSS.escape(value);
+      }
+      return value.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+    }
+
+    function removeChatElementById(messageId) {
+      if (!chatMessages || !messageId) return;
+      const selector = '[data-message-id="' + escapeSelector(messageId) + '"]';
+      const element = chatMessages.querySelector(selector);
+      if (element && element.parentElement === chatMessages) {
+        element.remove();
+      }
+    }
+
+    function rebuildChatMessagesFromHistory() {
+      if (!chatMessages) return;
+      const entries = chatHistory.slice();
+      chatMessages.innerHTML = "";
+      if (chatPlaceholder && chatPlaceholder.parentElement) {
+        chatPlaceholder.remove();
+      }
+      chatHistory.length = 0;
+      chatUserDirectory.clear();
+      entries.forEach((entry) => {
+        const clone = Object.assign({}, entry);
+        if (Array.isArray(entry.categories)) {
+          clone.categories = entry.categories.slice();
+        }
+        addChatMessage(clone);
+      });
+      if (chatHistory.length === 0 && chatPlaceholder) {
+        chatMessages.appendChild(chatPlaceholder);
+      }
+      if (chatMessages.scrollHeight) {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+    }
+
+    function removeChatMessageById(messageId) {
+      if (!messageId) return;
+      const index = chatHistory.findIndex((item) => item.id === messageId);
+      if (index === -1) return;
+      chatHistory.splice(index, 1);
+      rebuildChatMessagesFromHistory();
+    }
+
     function send(message) {
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         return false;
@@ -1025,6 +1074,16 @@
 
     function addChatMessage(event) {
       if (!chatMessages || !event || typeof event !== "object") return;
+      const messageId = typeof event.id === "string" && event.id
+        ? event.id
+        : "";
+      if (
+        messageId &&
+        chatHistory.some((item) => item.id === messageId)
+      ) {
+        return;
+      }
+
       const { userId, timestamp } = event;
       const rawMessage = typeof event.message === "string" ? event.message : "";
       const trimmedMessage = rawMessage.trim();
@@ -1050,6 +1109,7 @@
         : null;
 
       const entry = {
+        id: messageId,
         userId: typeof userId === "string" ? userId : "Unknown",
         message: trimmedMessage,
         timestamp: typeof timestamp === "number" ? timestamp : Date.now(),
@@ -1080,10 +1140,16 @@
         chatUserDirectory.set(entry.userId, entry.kthId);
       }
 
+      const isOwnMessage = typeof entry.kthId === "string" &&
+        entry.kthId.length > 0 &&
+        entry.kthId === ownKthId;
+
       chatHistory.push(entry);
       while (chatHistory.length > MAX_CHAT_MESSAGES) {
-        chatHistory.shift();
-        if (chatMessages.firstElementChild) {
+        const removed = chatHistory.shift();
+        if (removed && removed.id) {
+          removeChatElementById(removed.id);
+        } else if (chatMessages.firstElementChild) {
           chatMessages.removeChild(chatMessages.firstElementChild);
         }
       }
@@ -1095,8 +1161,14 @@
         ? baseClass + " chat-message--bingo"
         : baseClass;
       wrapper.dataset.userId = entry.userId;
+      if (messageId) {
+        wrapper.dataset.messageId = messageId;
+      }
       if (isContinuation) {
         wrapper.classList.add("chat-message--continued");
+      }
+      if (isOwnMessage) {
+        wrapper.classList.add("chat-message--own");
       }
 
       const avatar = createAvatarElement(entry, isContinuation);
@@ -1154,6 +1226,30 @@
       }
 
       appendLinkPreviews(linkUrls, entry, content);
+
+      if (isOwnMessage && messageId) {
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "chat-message__delete";
+        deleteBtn.setAttribute("aria-label", "Ta bort meddelande");
+        deleteBtn.textContent = "×";
+        deleteBtn.addEventListener("click", (evt) => {
+          evt.preventDefault();
+          evt.stopPropagation();
+          if (deleteBtn.disabled) return;
+          deleteBtn.disabled = true;
+          if (!send({ type: "deleteChat", id: messageId })) {
+            deleteBtn.disabled = false;
+            setStatus(
+              "Kunde inte ta bort meddelandet. Försök igen.",
+              "send",
+              "error",
+            );
+            window.setTimeout(() => clearStatus("send"), 4000);
+          }
+        });
+        content.appendChild(deleteBtn);
+      }
 
       wrapper.appendChild(avatar);
       wrapper.appendChild(content);
@@ -1332,6 +1428,10 @@
         addChatMessage(payload);
       } else if (payload.type === "highlight") {
         enqueueHighlight(payload);
+      } else if (payload.type === "chatDelete") {
+        if (typeof payload.id === "string") {
+          removeChatMessageById(payload.id);
+        }
       } else if (payload.type === "boardUpdate") {
         applyRemoteBoardState(payload.clicked, payload);
       } else if (payload.type === "peerSelections") {
