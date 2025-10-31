@@ -454,6 +454,53 @@
       return value + " " + (value === 1 ? "ruta" : "rutor");
     }
 
+    function createLeaderboardBoard(entry) {
+      if (!entry || !Array.isArray(entry.board) || entry.board.length === 0) {
+        return null;
+      }
+      const length = entry.board.length;
+      const size = Math.sqrt(length);
+      if (!Number.isInteger(size) || size <= 0) {
+        return null;
+      }
+
+      const clicked = new Set();
+      if (Array.isArray(entry.clicked)) {
+        entry.clicked.forEach((value) => {
+          const num = typeof value === "number" ? value : Number(value);
+          if (Number.isInteger(num) && num >= 0 && num < length) {
+            clicked.add(num);
+          }
+        });
+      }
+
+      const container = document.createElement("div");
+      container.className = "board-toplist__board";
+      container.setAttribute("aria-hidden", "true");
+
+      const grid = document.createElement("div");
+      grid.className = "board-toplist__grid";
+      grid.style.setProperty("grid-template-columns", `repeat(${size}, minmax(0, 1fr))`);
+
+      entry.board.forEach((cellValue, index) => {
+        const cell = document.createElement("div");
+        cell.className = "board-toplist__cell";
+        if (clicked.has(index)) {
+          cell.classList.add("board-toplist__cell--checked");
+        }
+        cell.textContent =
+          typeof cellValue === "string"
+            ? cellValue
+            : cellValue == null
+            ? ""
+            : String(cellValue);
+        grid.appendChild(cell);
+      });
+
+      container.appendChild(grid);
+      return container;
+    }
+
     function renderLeaderboard(entries, updatedAt) {
       if (!boardToplistList) return;
       leaderboardState.entries = entries.slice();
@@ -482,6 +529,11 @@
           item.classList.add("board-toplist__item--self");
         }
 
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "board-toplist__toggle";
+        toggle.setAttribute("aria-expanded", "false");
+
         const rank = document.createElement("span");
         rank.className = "board-toplist__rank";
         rank.textContent = String(index + 1);
@@ -495,12 +547,41 @@
 
         const stats = document.createElement("span");
         stats.className = "board-toplist__score";
-        stats.textContent =
-          formatBingoLabel(entry.bingoCount) +
-          " • " +
-          formatBoxLabel(entry.boxCount);
+        const statsLabel =
+          formatBingoLabel(entry.bingoCount) + " • " + formatBoxLabel(entry.boxCount);
+        stats.textContent = statsLabel;
 
-        item.append(rank, name, stats);
+        const chevron = document.createElement("span");
+        chevron.className = "board-toplist__chevron";
+        chevron.setAttribute("aria-hidden", "true");
+        chevron.textContent = "▸";
+        stats.appendChild(chevron);
+
+        toggle.append(rank, name, stats);
+        item.appendChild(toggle);
+
+        const boardPreview = createLeaderboardBoard(entry);
+        if (boardPreview) {
+          const boardId = "boardToplistPlayer-" + index;
+          boardPreview.id = boardId;
+          toggle.setAttribute("aria-controls", boardId);
+          boardPreview.hidden = true;
+          item.appendChild(boardPreview);
+
+          toggle.addEventListener("click", () => {
+            const expanded = toggle.getAttribute("aria-expanded") === "true";
+            const nextExpanded = !expanded;
+            toggle.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
+            item.classList.toggle("board-toplist__item--expanded", nextExpanded);
+            boardPreview.hidden = !nextExpanded;
+            boardPreview.setAttribute("aria-hidden", nextExpanded ? "false" : "true");
+            chevron.textContent = nextExpanded ? "▾" : "▸";
+          });
+        } else {
+          chevron.textContent = "";
+          toggle.disabled = true;
+        }
+
         fragment.appendChild(item);
       });
 
@@ -1248,7 +1329,24 @@
                 : Number(entry.boxCount);
             const bingoCount = Number.isFinite(bingoRaw) ? bingoRaw : 0;
             const boxCount = Number.isFinite(boxRaw) ? boxRaw : 0;
-            return { userId: displayName, kthId, bingoCount, boxCount };
+            const boardSource = Array.isArray(entry.board) ? entry.board : [];
+            const board = boardSource.map((cell) => {
+              if (typeof cell === "string") return cell;
+              if (cell == null) return "";
+              return String(cell);
+            });
+            const clickedSource = Array.isArray(entry.clicked) ? entry.clicked : [];
+            const clickedSet = new Set();
+            const clicked = [];
+            clickedSource.forEach((value) => {
+              const num = typeof value === "number" ? value : Number(value);
+              if (Number.isInteger(num) && num >= 0 && !clickedSet.has(num)) {
+                clickedSet.add(num);
+                clicked.push(num);
+              }
+            });
+            clicked.sort((a, b) => a - b);
+            return { userId: displayName, kthId, bingoCount, boxCount, board, clicked };
           })
           .filter(Boolean);
 
