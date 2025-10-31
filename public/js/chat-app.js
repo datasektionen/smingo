@@ -62,10 +62,10 @@
       const normalize = (value) =>
         typeof value === "string"
           ? value
-              .toLowerCase()
-              .normalize("NFKD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .replace(/[^a-z0-9]/g, "")
+            .toLowerCase()
+            .normalize("NFKD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]/g, "")
           : "";
       const push = (value) => {
         const normalized = normalize(value);
@@ -216,7 +216,7 @@
       } else if (chatAttachButton) {
         chatAttachButton.setAttribute(
           "aria-disabled",
-          active ? "true" : "false"
+          active ? "true" : "false",
         );
       }
     }
@@ -229,8 +229,9 @@
     }
 
     function determineAttachmentType(file, url) {
-      const typeHint =
-        file && typeof file.type === "string" ? file.type.toLowerCase() : "";
+      const typeHint = file && typeof file.type === "string"
+        ? file.type.toLowerCase()
+        : "";
       if (typeHint.startsWith("video/")) return "video";
       if (typeHint.startsWith("image/")) return "image";
       const source = file && typeof file.name === "string" ? file.name : url;
@@ -271,8 +272,7 @@
     function createLinkPreview(url, type) {
       if (!url || !type) return null;
       const wrapper = document.createElement("div");
-      wrapper.className =
-        "chat-attachment " +
+      wrapper.className = "chat-attachment " +
         (type === "video"
           ? "chat-attachment--video"
           : "chat-attachment--image");
@@ -313,8 +313,9 @@
 
     async function uploadAttachment(file) {
       const formData = new FormData();
-      const filename =
-        typeof file.name === "string" && file.name ? file.name : "upload";
+      const filename = typeof file.name === "string" && file.name
+        ? file.name
+        : "upload";
       formData.append("attachment", file, filename);
 
       let response;
@@ -327,7 +328,7 @@
         throw new Error(
           networkError && networkError.message
             ? networkError.message
-            : "Network error"
+            : "Network error",
         );
       }
 
@@ -349,26 +350,27 @@
         "";
 
       if (!response.ok || errorDetail) {
-        const errorMessage =
-          errorDetail || response.statusText || "Upload failed";
+        const errorMessage = errorDetail || response.statusText ||
+          "Upload failed";
         throw new Error(errorMessage);
       }
 
       const url = payload && typeof payload.url === "string" ? payload.url : "";
-      const typeHint =
-        payload && typeof payload.type === "string" ? payload.type : "";
-      const nameHint =
-        payload && typeof payload.name === "string" ? payload.name : "";
+      const typeHint = payload && typeof payload.type === "string"
+        ? payload.type
+        : "";
+      const nameHint = payload && typeof payload.name === "string"
+        ? payload.name
+        : "";
 
       if (!url) {
         throw new Error("Upload completed without a usable URL");
       }
-      const type =
-        typeHint === "video"
-          ? "video"
-          : typeHint === "image"
-          ? "image"
-          : determineAttachmentType(file, url);
+      const type = typeHint === "video"
+        ? "video"
+        : typeHint === "image"
+        ? "image"
+        : determineAttachmentType(file, url);
       const name = nameHint || (typeof file.name === "string" ? file.name : "");
       return { url, type, name };
     }
@@ -400,10 +402,9 @@
         const participants = peerSelections.get(cellValue) || [];
         const selfSelected = btn.classList.contains("checked");
         const otherPlayers = participants.filter(
-          (entry) => entry && entry.kthId !== ownKthId
+          (entry) => entry && entry.kthId !== ownKthId,
         );
-        const shouldShow =
-          (selfSelected && otherPlayers.length > 0) ||
+        const shouldShow = (selfSelected && otherPlayers.length > 0) ||
           (!selfSelected && participants.length > 0);
         let indicator = btn.querySelector(".cell-peer-indicator");
         if (shouldShow) {
@@ -425,10 +426,9 @@
             const prefix = selfSelected
               ? PEER_TOOLTIP_PREFIX_SELF
               : PEER_TOOLTIP_PREFIX_OTHERS;
-            const tooltip =
-              tooltipNames.length === 1
-                ? prefix + " " + tooltipNames[0]
-                : prefix + "\\n" + tooltipNames.join("\\n");
+            const tooltip = tooltipNames.length === 1
+              ? prefix + " " + tooltipNames[0]
+              : prefix + "\n" + tooltipNames.join("\n");
             btn.setAttribute("title", tooltip);
             btn.dataset.peerTooltip = "1";
           }
@@ -480,7 +480,10 @@
 
       const grid = document.createElement("div");
       grid.className = "board-toplist__grid";
-      grid.style.setProperty("grid-template-columns", `repeat(${size}, minmax(0, 1fr))`);
+      grid.style.setProperty(
+        "grid-template-columns",
+        `repeat(${size}, minmax(0, 1fr))`,
+      );
 
       entry.board.forEach((cellValue, index) => {
         const cell = document.createElement("div");
@@ -488,12 +491,11 @@
         if (clicked.has(index)) {
           cell.classList.add("board-toplist__cell--checked");
         }
-        cell.textContent =
-          typeof cellValue === "string"
-            ? cellValue
-            : cellValue == null
-            ? ""
-            : String(cellValue);
+        cell.textContent = typeof cellValue === "string"
+          ? cellValue
+          : cellValue == null
+          ? ""
+          : String(cellValue);
         grid.appendChild(cell);
       });
 
@@ -547,8 +549,9 @@
 
         const stats = document.createElement("span");
         stats.className = "board-toplist__score";
-        const statsLabel =
-          formatBingoLabel(entry.bingoCount) + " • " + formatBoxLabel(entry.boxCount);
+        const statsLabel = formatBingoLabel(entry.bingoCount) +
+          " • " +
+          formatBoxLabel(entry.boxCount);
         stats.textContent = statsLabel;
 
         const chevron = document.createElement("span");
@@ -571,10 +574,19 @@
           toggle.addEventListener("click", () => {
             const expanded = toggle.getAttribute("aria-expanded") === "true";
             const nextExpanded = !expanded;
-            toggle.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
-            item.classList.toggle("board-toplist__item--expanded", nextExpanded);
+            toggle.setAttribute(
+              "aria-expanded",
+              nextExpanded ? "true" : "false",
+            );
+            item.classList.toggle(
+              "board-toplist__item--expanded",
+              nextExpanded,
+            );
             boardPreview.hidden = !nextExpanded;
-            boardPreview.setAttribute("aria-hidden", nextExpanded ? "false" : "true");
+            boardPreview.setAttribute(
+              "aria-hidden",
+              nextExpanded ? "false" : "true",
+            );
             chevron.textContent = nextExpanded ? "▾" : "▸";
           });
         } else {
@@ -589,7 +601,8 @@
       if (boardToplistUpdated) {
         const timestamp = Number.isFinite(updatedAt) ? updatedAt : Date.now();
         const time = new Date(timestamp);
-        boardToplistUpdated.textContent = "Uppdaterad " + time.toLocaleTimeString();
+        boardToplistUpdated.textContent = "Uppdaterad " +
+          time.toLocaleTimeString();
       }
     }
 
@@ -630,7 +643,7 @@
         const distanceCovered = item.startX - item.position;
         const progress = Math.min(
           Math.max(distanceCovered / item.travelDistance, 0),
-          1
+          1,
         );
         const fadeInThreshold = 0.08;
         const fadeOutThreshold = 0.92;
@@ -641,8 +654,8 @@
           opacity = Math.max(0, (1 - progress) / (1 - fadeOutThreshold));
         }
         item.el.style.opacity = opacity.toFixed(3);
-        item.el.style.transform =
-          "translate3d(" + item.position + "px, -50%, 0)";
+        item.el.style.transform = "translate3d(" + item.position +
+          "px, -50%, 0)";
 
         if (item.position <= -item.width - HIGHLIGHT_GAP) {
           toRemove.push(item);
@@ -682,7 +695,7 @@
       for (let i = 0; i < config.cells.length; i++) {
         if (
           localStorage.getItem(
-            "clicked" + config.localStorageIdent + "_" + i
+            "clicked" + config.localStorageIdent + "_" + i,
           ) === "true"
         ) {
           result.push(i);
@@ -705,17 +718,65 @@
       return result;
     }
 
+    function applyRemoteBoardState(clickedList, metadata = {}) {
+      if (!Array.isArray(clickedList)) return;
+      const normalized = [];
+      const seen = new Set();
+      clickedList.forEach((value) => {
+        const num = typeof value === "number" ? value : Number(value);
+        if (
+          Number.isInteger(num) &&
+          num >= 0 &&
+          num < config.cells.length &&
+          !seen.has(num)
+        ) {
+          seen.add(num);
+          normalized.push(num);
+        }
+      });
+      normalized.sort((a, b) => a - b);
+      const clickedSet = new Set(normalized);
+      const buttons = document.querySelectorAll("main.board-grid button.cell");
+      if (buttons.length === config.cells.length) {
+        buttons.forEach((btn, idx) => {
+          if (clickedSet.has(idx)) {
+            btn.classList.add("checked");
+          } else {
+            btn.classList.remove("checked");
+          }
+        });
+      }
+
+      for (let i = 0; i < config.cells.length; i++) {
+        const key = "clicked" + config.localStorageIdent + "_" + i;
+        if (clickedSet.has(i)) {
+          localStorage.setItem(key, "true");
+        } else {
+          localStorage.removeItem(key);
+        }
+      }
+
+      latestClicked = normalized;
+      if (typeof window.checkBingo === "function") {
+        window.checkBingo();
+      }
+      if (metadata && metadata.source === "admin") {
+        setStatus("Admin uppdaterade din bricka.", "connection", "info");
+        window.setTimeout(() => clearStatus("connection"), 4000);
+      }
+    }
+
     function formatChatMessageText(message) {
       const fragment = document.createDocumentFragment();
       let hasSelfPing = false;
-      const parts = message.match(/\\S+|\\s+/g) ?? [message];
-      const urlPattern = /^(https?:\/\/[^\\s]+?)([.,!?)]*)$/i;
+      const parts = message.match(/\S+|\s+/g) ?? [message];
+      const urlPattern = /^(https?:\/\/[^\s]+?)([.,!?)]*)$/i;
       const urls = [];
 
       for (const part of parts) {
         if (!part) continue;
         if (part.startsWith("@")) {
-          const match = part.match(/^@\\S*/);
+          const match = part.match(/^@\S*/);
           const mentionText = match ? match[0] : part;
           const remainder = match ? part.slice(mentionText.length) : "";
 
@@ -765,12 +826,12 @@
         !entry ||
         typeof entry.attachmentUrl !== "string" ||
         !entry.attachmentUrl
-      )
+      ) {
         return null;
+      }
       const type = entry.attachmentType === "video" ? "video" : "image";
       const wrapper = document.createElement("div");
-      wrapper.className =
-        "chat-attachment " +
+      wrapper.className = "chat-attachment " +
         (type === "video"
           ? "chat-attachment--video"
           : "chat-attachment--image");
@@ -867,12 +928,12 @@
 
     function enqueueHighlight(event) {
       if (!highlightBanner || !event || typeof event !== "object") return;
-      const user =
-        typeof event.userId === "string" && event.userId
-          ? event.userId
-          : "Someone";
-      const cell =
-        typeof event.cell === "string" && event.cell ? event.cell : "a square";
+      const user = typeof event.userId === "string" && event.userId
+        ? event.userId
+        : "Someone";
+      const cell = typeof event.cell === "string" && event.cell
+        ? event.cell
+        : "a square";
       const text = user + ' fick "' + cell + '"';
       const messageEl = document.createElement("div");
       messageEl.className = "highlight-banner__message";
@@ -882,10 +943,9 @@
 
       const messageWidth = messageEl.getBoundingClientRect().width || 0;
       const bannerWidth = highlightBanner.clientWidth || window.innerWidth;
-      const startTail =
-        highlightItems.size > 0
-          ? Math.max(getHighlightTail() + HIGHLIGHT_GAP, bannerWidth)
-          : bannerWidth;
+      const startTail = highlightItems.size > 0
+        ? Math.max(getHighlightTail() + HIGHLIGHT_GAP, bannerWidth)
+        : bannerWidth;
       const startX = startTail;
       const travelDistance = Math.max(startX + messageWidth, 1);
 
@@ -942,8 +1002,7 @@
         img.loading = "lazy";
         img.decoding = "async";
         img.referrerPolicy = "no-referrer";
-        img.src =
-          "https://zfinger.datasektionen.se/user/" +
+        img.src = "https://zfinger.datasektionen.se/user/" +
           encodeURIComponent(kthId) +
           "/image/100";
         img.addEventListener("error", () => {
@@ -969,26 +1028,26 @@
       const { userId, timestamp } = event;
       const rawMessage = typeof event.message === "string" ? event.message : "";
       const trimmedMessage = rawMessage.trim();
-      const attachmentUrl =
-        typeof event.attachmentUrl === "string" ? event.attachmentUrl : "";
-      const attachmentType =
-        event.attachmentType === "video"
-          ? "video"
-          : event.attachmentType === "image"
-          ? "image"
-          : "";
-      const attachmentName =
-        typeof event.attachmentName === "string"
-          ? event.attachmentName.replace(/[\\r\\n]+/g, " ").slice(0, 120)
-          : "";
+      const attachmentUrl = typeof event.attachmentUrl === "string"
+        ? event.attachmentUrl
+        : "";
+      const attachmentType = event.attachmentType === "video"
+        ? "video"
+        : event.attachmentType === "image"
+        ? "image"
+        : "";
+      const attachmentName = typeof event.attachmentName === "string"
+        ? event.attachmentName.replace(/[\r\n]+/g, " ").slice(0, 120)
+        : "";
       if (!trimmedMessage && !attachmentUrl) return;
 
       if (chatPlaceholder) {
         chatPlaceholder.remove();
       }
 
-      const previousEntry =
-        chatHistory.length > 0 ? chatHistory[chatHistory.length - 1] : null;
+      const previousEntry = chatHistory.length > 0
+        ? chatHistory[chatHistory.length - 1]
+        : null;
 
       const entry = {
         userId: typeof userId === "string" ? userId : "Unknown",
@@ -1007,8 +1066,8 @@
         entry.kthId = chatUserDirectory.get(entry.userId) || "";
       }
 
-      const isContinuation =
-        !!previousEntry && previousEntry.userId === entry.userId;
+      const isContinuation = !!previousEntry &&
+        previousEntry.userId === entry.userId;
       if (
         !entry.kthId &&
         isContinuation &&
@@ -1066,7 +1125,7 @@
             {
               hour: "2-digit",
               minute: "2-digit",
-            }
+            },
           );
           header.appendChild(idSpan);
           header.appendChild(timeSpan);
@@ -1129,23 +1188,22 @@
               formatFileSize(ATTACHMENT_MAX_SIZE_BYTES) +
               ".",
             "attachment",
-            "error"
+            "error",
           );
           return;
         }
         setStatus(
           "Laddar upp " + describeAttachment(file) + "…",
           "upload",
-          "info"
+          "info",
         );
         setUploadingState(true);
         try {
           const uploaded = await uploadAttachment(file);
           attachmentUrl = uploaded.url;
-          attachmentType =
-            uploaded.type || determineAttachmentType(file, uploaded.url);
-          attachmentName =
-            uploaded.name ||
+          attachmentType = uploaded.type ||
+            determineAttachmentType(file, uploaded.url);
+          attachmentName = uploaded.name ||
             (typeof file.name === "string" && file.name ? file.name : "");
           const displayName = attachmentName || describeAttachment(file);
           setStatus("Bilaga uppladdad: " + displayName, "upload", "success");
@@ -1174,7 +1232,7 @@
         setStatus(
           "Anslutning förlorad. Försöker att återansluta...",
           "send",
-          "error"
+          "error",
         );
         return;
       }
@@ -1203,10 +1261,9 @@
 
     if (chatFileInput instanceof HTMLInputElement) {
       chatFileInput.addEventListener("change", () => {
-        const file =
-          chatFileInput.files && chatFileInput.files[0]
-            ? chatFileInput.files[0]
-            : null;
+        const file = chatFileInput.files && chatFileInput.files[0]
+          ? chatFileInput.files[0]
+          : null;
         if (!file) {
           resetAttachment();
           clearStatus("attachment");
@@ -1216,7 +1273,7 @@
           setStatus(
             "Only images or videos are allowed.",
             "attachment",
-            "error"
+            "error",
           );
           resetAttachment();
           return;
@@ -1232,7 +1289,7 @@
               formatFileSize(ATTACHMENT_MAX_SIZE_BYTES) +
               ".",
             "attachment",
-            "error"
+            "error",
           );
           resetAttachment();
           return;
@@ -1275,6 +1332,8 @@
         addChatMessage(payload);
       } else if (payload.type === "highlight") {
         enqueueHighlight(payload);
+      } else if (payload.type === "boardUpdate") {
+        applyRemoteBoardState(payload.clicked, payload);
       } else if (payload.type === "peerSelections") {
         peerSelections.clear();
         const selections = payload.selections;
@@ -1284,15 +1343,17 @@
             if (
               !Array.isArray(config.cells) ||
               config.cells.indexOf(cell) === -1
-            )
+            ) {
               return;
+            }
             const seen = new Set();
             const normalized = [];
             value.forEach((entry) => {
               if (!entry || typeof entry !== "object") return;
               const kthId = typeof entry.kthId === "string" ? entry.kthId : "";
-              const displayName =
-                typeof entry.displayName === "string" ? entry.displayName : "";
+              const displayName = typeof entry.displayName === "string"
+                ? entry.displayName
+                : "";
               if (!kthId || !displayName || seen.has(kthId)) return;
               seen.add(kthId);
               normalized.push({ kthId, displayName });
@@ -1315,18 +1376,15 @@
                 ? entry.kthId.trim()
                 : "";
             if (!displayName) return null;
-            const kthId =
-              typeof entry.kthId === "string" && entry.kthId.trim()
-                ? entry.kthId.trim()
-                : "";
-            const bingoRaw =
-              typeof entry.bingoCount === "number"
-                ? entry.bingoCount
-                : Number(entry.bingoCount);
-            const boxRaw =
-              typeof entry.boxCount === "number"
-                ? entry.boxCount
-                : Number(entry.boxCount);
+            const kthId = typeof entry.kthId === "string" && entry.kthId.trim()
+              ? entry.kthId.trim()
+              : "";
+            const bingoRaw = typeof entry.bingoCount === "number"
+              ? entry.bingoCount
+              : Number(entry.bingoCount);
+            const boxRaw = typeof entry.boxCount === "number"
+              ? entry.boxCount
+              : Number(entry.boxCount);
             const bingoCount = Number.isFinite(bingoRaw) ? bingoRaw : 0;
             const boxCount = Number.isFinite(boxRaw) ? boxRaw : 0;
             const boardSource = Array.isArray(entry.board) ? entry.board : [];
@@ -1335,7 +1393,9 @@
               if (cell == null) return "";
               return String(cell);
             });
-            const clickedSource = Array.isArray(entry.clicked) ? entry.clicked : [];
+            const clickedSource = Array.isArray(entry.clicked)
+              ? entry.clicked
+              : [];
             const clickedSet = new Set();
             const clicked = [];
             clickedSource.forEach((value) => {
@@ -1346,7 +1406,14 @@
               }
             });
             clicked.sort((a, b) => a - b);
-            return { userId: displayName, kthId, bingoCount, boxCount, board, clicked };
+            return {
+              userId: displayName,
+              kthId,
+              bingoCount,
+              boxCount,
+              board,
+              clicked,
+            };
           })
           .filter(Boolean);
 
@@ -1356,10 +1423,10 @@
           return a.userId.localeCompare(b.userId);
         });
 
-        const updatedAt =
-          typeof payload.updatedAt === "number" && Number.isFinite(payload.updatedAt)
-            ? payload.updatedAt
-            : Date.now();
+        const updatedAt = typeof payload.updatedAt === "number" &&
+            Number.isFinite(payload.updatedAt)
+          ? payload.updatedAt
+          : Date.now();
         renderLeaderboard(normalized, updatedAt);
       }
     }

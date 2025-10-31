@@ -245,6 +245,55 @@ export function broadcastPeerSelections() {
   broadcastToPlayers(payload);
 }
 
+function handleAdminSetCell(data: Record<string, unknown>) {
+  const playerId = typeof data.playerId === "string" ? data.playerId : "";
+  const cellRaw = data.cell;
+  const checkedRaw = data.checked;
+  if (!playerId) return;
+  const cellIndex = typeof cellRaw === "number" ? cellRaw : Number(cellRaw);
+  if (!Number.isInteger(cellIndex)) return;
+  if (typeof checkedRaw !== "boolean") return;
+  const session = playerSessions.get(playerId);
+  if (!session) return;
+  if (
+    !Array.isArray(session.board) || cellIndex < 0 ||
+    cellIndex >= session.board.length
+  ) {
+    return;
+  }
+
+  const clickedSet = new Set(session.clicked);
+  const currentlyChecked = clickedSet.has(cellIndex);
+  if (checkedRaw === currentlyChecked) {
+    return;
+  }
+
+  if (checkedRaw) {
+    clickedSet.add(cellIndex);
+  } else {
+    clickedSet.delete(cellIndex);
+  }
+  const nextClicked = Array.from(clickedSet).sort((a, b) => a - b);
+  session.clicked = nextClicked;
+  session.lastUpdate = Date.now();
+  session.bingoCount = computeBingoCount(session.board.length, nextClicked);
+
+  broadcastAdminState();
+  broadcastPeerSelections();
+  broadcastLeaderboard();
+
+  const targetSocket = playerSockets.get(playerId);
+  if (targetSocket && targetSocket.readyState === WebSocket.OPEN) {
+    const updatePayload = JSON.stringify({
+      type: "boardUpdate",
+      clicked: nextClicked,
+      source: "admin",
+      timestamp: Date.now(),
+    });
+    targetSocket.send(updatePayload);
+  }
+}
+
 export function sendChatHistory(target: WebSocket) {
   if (recentChatMessages.length === 0) return;
   const payload = JSON.stringify({
@@ -273,6 +322,24 @@ export function setupAdminSocket(ws: WebSocket) {
   };
   ws.addEventListener("close", cleanup);
   ws.addEventListener("error", cleanup);
+  ws.addEventListener("message", (event: MessageEvent) => {
+    if (typeof event.data !== "string") return;
+    let payload: unknown;
+    try {
+      payload = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    if (!payload || typeof payload !== "object") return;
+    const data = payload as Record<string, unknown>;
+    if (
+      data.type === "adminUpdate" &&
+      data.action === "setCell" &&
+      typeof data.playerId === "string"
+    ) {
+      handleAdminSetCell(data);
+    }
+  });
   sendAdminState(ws);
 }
 
