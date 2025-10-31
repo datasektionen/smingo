@@ -41,6 +41,13 @@ const commonCards = [
   `Elektroniskt röstningssystem strular`,
   `Wikipediasidan för Schulze visas på skärmen`,
   `"De här borde lösas bättre till nästa år"`,
+  `Kandidat/motionär presenterar i max 20 sekunder`,
+  `Talman börjar argumentera för en ståndpunkt i sakfråga`,
+  `Talman citerar mötesordningen fel`,
+  `Talman glömmer vilken punkt mötet är på`,
+  `Talman mumlar`,
+  `Talman suckar högljutt åt någons förslag`,
+  `Ordningsfråga`,
 ];
 
 export default commonCards;
