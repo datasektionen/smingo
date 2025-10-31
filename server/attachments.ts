@@ -119,7 +119,6 @@ export function extractUploadUrl(payload: unknown): string {
 }
 
 export function extractUploadError(payload: unknown): string {
-  console.log("extractUploadError payload:", payload);
   if (!payload || typeof payload !== "object" || payload === null) {
     return "";
   }

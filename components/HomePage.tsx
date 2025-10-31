@@ -1,14 +1,9 @@
 import type { FC } from "hono/jsx";
 import ChatPanel from "./ChatPanel.tsx";
+import BoardNavbar, { type BoardNavbarItem } from "./BoardNavbar.tsx";
+import BingoBoard from "./BingoBoard.tsx";
+import TopListBoard from "./TopListBoard.tsx";
 import type { UserProfile } from "../shared/types.ts";
-
-interface UserProfile {
-  kthId: string;
-  email: string;
-  firstName: string;
-  familyName: string;
-  yearTag: string;
-}
 
 interface HomePageProps {
   title: string;
@@ -34,6 +29,53 @@ const HomePage: FC<HomePageProps> = ({
     cells,
     userProfile,
   }).replace(/</g, "\\u003c");
+  const boardNavScript = `
+    (() => {
+      const section = document.getElementById("boardSection");
+      if (!section) return;
+      const nav = section.querySelector(".board-navbar");
+      if (!nav) return;
+
+      const buttons = Array.from(
+        nav.querySelectorAll("button[data-view]")
+      );
+      const panels = Array.from(
+        section.querySelectorAll("[data-board-view]")
+      );
+
+      const setActiveView = (view) => {
+        if (!view) return;
+        section.setAttribute("data-view", view);
+        buttons.forEach((button) => {
+          const isActive = button.dataset.view === view;
+          button.setAttribute("aria-selected", isActive ? "true" : "false");
+          button.classList.toggle("board-navbar__button--active", isActive);
+        });
+        panels.forEach((panel) => {
+          const isActive = panel.dataset.boardView === view;
+          panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+        });
+      };
+
+      nav.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-view]");
+        if (!button) return;
+        if (button.getAttribute("aria-selected") === "true") return;
+        event.preventDefault();
+        setActiveView(button.dataset.view);
+      });
+
+      if (!section.dataset.view && buttons[0]) {
+        setActiveView(buttons[0].dataset.view);
+      } else {
+        setActiveView(section.dataset.view);
+      }
+    })();
+  `.replace(/</g, "\\u003c");
+  const boardNavItems: readonly BoardNavbarItem[] = [
+    { id: "bingo", label: "Bräde" },
+    { id: "toplist", label: "Topplista" },
+  ];
 
   return (
     <div class="home-content">
@@ -52,36 +94,28 @@ const HomePage: FC<HomePageProps> = ({
       </header>
       <div class="home-columns">
         <ChatPanel userId={userDisplayName} />
-        <main class="board-column board-grid">
-          {cells.map((thing, i) => (
-            <button
-              class="cell"
-              _={`
-                on click
-                  toggle .checked on me
-                  then set localStorage.clicked${localStorageIdent}_${i} to me matches .checked
-                  then call window.checkBingo()
-                  then if window.smingoSendState
-                    call window.smingoSendState()
-                  end
-                end
-                on load
-                  if localStorage.clicked${localStorageIdent}_${i} == "true"
-                    add .checked to me
-                  end
-                  call window.checkBingo()
-                end
-              `}
-            >
-              {thing}
-            </button>
-          ))}
-        </main>
+        <section
+          id="boardSection"
+          class="board-section"
+          data-view="bingo"
+          aria-live="polite"
+        >
+          <BoardNavbar
+            items={boardNavItems}
+            activeId="bingo"
+          />
+          <BingoBoard cells={cells} localStorageIdent={localStorageIdent} />
+          <TopListBoard />
+        </section>
       </div>
       <script
         id="smingoConfig"
         type="application/json"
         dangerouslySetInnerHTML={{ __html: configJson }}
+      ></script>
+      <script
+        type="module"
+        dangerouslySetInnerHTML={{ __html: boardNavScript }}
       ></script>
       <script type="module" src="/assets/chat-app.js"></script>
     </div>

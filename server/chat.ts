@@ -69,6 +69,29 @@ function createAdminPayload() {
   });
 }
 
+function serializeLeaderboard() {
+  return Array.from(playerSessions.values())
+    .map((session) => ({
+      userId: session.userId,
+      kthId: session.kthId,
+      bingoCount: session.bingoCount,
+      boxCount: session.clicked.length,
+    }))
+    .sort((a, b) => {
+      if (b.bingoCount !== a.bingoCount) return b.bingoCount - a.bingoCount;
+      if (b.boxCount !== a.boxCount) return b.boxCount - a.boxCount;
+      return a.userId.localeCompare(b.userId);
+    });
+}
+
+function createLeaderboardPayload() {
+  return JSON.stringify({
+    type: "leaderboard",
+    players: serializeLeaderboard(),
+    updatedAt: Date.now(),
+  });
+}
+
 function computeBingoCount(boardLength: number, clicked: readonly number[]): number {
   const size = Math.sqrt(boardLength);
   if (!Number.isFinite(size) || !Number.isInteger(size) || size <= 0) {
@@ -165,6 +188,12 @@ export function broadcastChatMessage(message: ChatRecord) {
   broadcastToPlayers(JSON.stringify(message));
 }
 
+function broadcastLeaderboard() {
+  if (playerSockets.size === 0) return;
+  const payload = createLeaderboardPayload();
+  broadcastToPlayers(payload);
+}
+
 function createPeerSelectionMap() {
   const map = new Map<string, Map<string, string>>();
   for (const session of playerSessions.values()) {
@@ -246,6 +275,7 @@ export function setupPlayerSocket(ws: WebSocket) {
       session = undefined;
       broadcastAdminState();
       broadcastPeerSelections();
+      broadcastLeaderboard();
     }
     playerSockets.delete(connectionId);
   };
@@ -303,6 +333,7 @@ export function setupPlayerSocket(ws: WebSocket) {
 
       broadcastAdminState();
       broadcastPeerSelections();
+      broadcastLeaderboard();
       sendChatHistory(ws);
     } else if (type === "state") {
       if (!session) return;
@@ -315,6 +346,7 @@ export function setupPlayerSocket(ws: WebSocket) {
       session.bingoCount = computeBingoCount(session.board.length, session.clicked);
       broadcastAdminState();
       broadcastPeerSelections();
+      broadcastLeaderboard();
       if (newCells.length > 0) {
         for (const idx of newCells) {
           const cellValue = session.board[idx] ?? `Cell ${idx + 1}`;

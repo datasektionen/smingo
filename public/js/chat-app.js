@@ -42,6 +42,11 @@
     let highlightFrame = null;
     let highlightLastTick = null;
     const peerSelections = new Map();
+    const leaderboardState = { entries: [], updatedAt: 0 };
+    const boardToplistSection = document.getElementById("board-view-toplist");
+    const boardToplistList = document.getElementById("boardToplistList");
+    const boardToplistEmpty = document.getElementById("boardToplistEmpty");
+    const boardToplistUpdated = document.getElementById("boardToplistUpdated");
     const ownKthId =
       config.userProfile && typeof config.userProfile.kthId === "string"
         ? config.userProfile.kthId
@@ -437,6 +442,74 @@
           }
         }
       });
+    }
+
+    function formatBingoLabel(count) {
+      const value = Number.isFinite(count) ? count : 0;
+      return value + " " + (value === 1 ? "bingo" : "bingon");
+    }
+
+    function formatBoxLabel(count) {
+      const value = Number.isFinite(count) ? count : 0;
+      return value + " " + (value === 1 ? "ruta" : "rutor");
+    }
+
+    function renderLeaderboard(entries, updatedAt) {
+      if (!boardToplistList) return;
+      leaderboardState.entries = entries.slice();
+      leaderboardState.updatedAt = updatedAt || Date.now();
+
+      boardToplistList.innerHTML = "";
+      if (!entries.length) {
+        if (boardToplistEmpty) {
+          boardToplistEmpty.removeAttribute("hidden");
+        }
+        if (boardToplistUpdated) {
+          boardToplistUpdated.textContent = "";
+        }
+        return;
+      }
+
+      if (boardToplistEmpty) {
+        boardToplistEmpty.setAttribute("hidden", "true");
+      }
+
+      const fragment = document.createDocumentFragment();
+      entries.forEach((entry, index) => {
+        const item = document.createElement("li");
+        item.className = "board-toplist__item";
+        if (entry.kthId && entry.kthId === ownKthId) {
+          item.classList.add("board-toplist__item--self");
+        }
+
+        const rank = document.createElement("span");
+        rank.className = "board-toplist__rank";
+        rank.textContent = String(index + 1);
+
+        const name = document.createElement("span");
+        name.className = "board-toplist__name";
+        name.textContent = entry.userId;
+        if (entry.kthId) {
+          name.title = entry.kthId;
+        }
+
+        const stats = document.createElement("span");
+        stats.className = "board-toplist__score";
+        stats.textContent =
+          formatBingoLabel(entry.bingoCount) +
+          " • " +
+          formatBoxLabel(entry.boxCount);
+
+        item.append(rank, name, stats);
+        fragment.appendChild(item);
+      });
+
+      boardToplistList.appendChild(fragment);
+      if (boardToplistUpdated) {
+        const timestamp = Number.isFinite(updatedAt) ? updatedAt : Date.now();
+        const time = new Date(timestamp);
+        boardToplistUpdated.textContent = "Uppdaterad " + time.toLocaleTimeString();
+      }
     }
 
     function ensureHighlightLoop() {
@@ -1149,6 +1222,47 @@
           });
         }
         updatePeerIndicators();
+      } else if (payload.type === "leaderboard") {
+        const list = Array.isArray(payload.players) ? payload.players : [];
+        const normalized = list
+          .map((entry) => {
+            if (!entry || typeof entry !== "object") return null;
+            const displayName =
+              typeof entry.userId === "string" && entry.userId.trim()
+                ? entry.userId.trim()
+                : typeof entry.kthId === "string" && entry.kthId.trim()
+                ? entry.kthId.trim()
+                : "";
+            if (!displayName) return null;
+            const kthId =
+              typeof entry.kthId === "string" && entry.kthId.trim()
+                ? entry.kthId.trim()
+                : "";
+            const bingoRaw =
+              typeof entry.bingoCount === "number"
+                ? entry.bingoCount
+                : Number(entry.bingoCount);
+            const boxRaw =
+              typeof entry.boxCount === "number"
+                ? entry.boxCount
+                : Number(entry.boxCount);
+            const bingoCount = Number.isFinite(bingoRaw) ? bingoRaw : 0;
+            const boxCount = Number.isFinite(boxRaw) ? boxRaw : 0;
+            return { userId: displayName, kthId, bingoCount, boxCount };
+          })
+          .filter(Boolean);
+
+        normalized.sort((a, b) => {
+          if (b.bingoCount !== a.bingoCount) return b.bingoCount - a.bingoCount;
+          if (b.boxCount !== a.boxCount) return b.boxCount - a.boxCount;
+          return a.userId.localeCompare(b.userId);
+        });
+
+        const updatedAt =
+          typeof payload.updatedAt === "number" && Number.isFinite(payload.updatedAt)
+            ? payload.updatedAt
+            : Date.now();
+        renderLeaderboard(normalized, updatedAt);
       }
     }
 
