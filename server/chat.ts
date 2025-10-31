@@ -13,6 +13,7 @@ export interface PlayerSession {
 
 export interface ChatRecord {
   type: "chat";
+  id: string;
   userId: string;
   kthId: string;
   message: string;
@@ -191,9 +192,27 @@ function broadcastToPlayers(payload: string) {
 export function broadcastChatMessage(message: ChatRecord) {
   recentChatMessages.push(message);
   if (recentChatMessages.length > RECENT_CHAT_LIMIT) {
-    recentChatMessages.splice(0, recentChatMessages.length - RECENT_CHAT_LIMIT);
+    recentChatMessages.splice(
+      0,
+      recentChatMessages.length - RECENT_CHAT_LIMIT,
+    );
   }
   broadcastToPlayers(JSON.stringify(message));
+}
+
+function broadcastChatDelete(messageId: string) {
+  const payload = JSON.stringify({
+    type: "chatDelete",
+    id: messageId,
+  });
+  broadcastToPlayers(payload);
+}
+
+function removeChatMessage(messageId: string) {
+  const index = recentChatMessages.findIndex((entry) => entry.id === messageId);
+  if (index === -1) return;
+  recentChatMessages.splice(index, 1);
+  broadcastChatDelete(messageId);
 }
 
 function broadcastLeaderboard() {
@@ -453,6 +472,7 @@ export function setupPlayerSocket(ws: WebSocket) {
         const bingoNumber = session.bingoCount;
         const chatPayload: ChatRecord = {
           type: "chat",
+          id: crypto.randomUUID(),
           userId: "",
           kthId: session.kthId,
           message: `${session.userId} got bingo #${bingoNumber}!`,
@@ -486,6 +506,7 @@ export function setupPlayerSocket(ws: WebSocket) {
       if (!message && !attachment) return;
       const chatPayload: ChatRecord = {
         type: "chat",
+        id: crypto.randomUUID(),
         userId: session.userId,
         kthId: session.kthId,
         message,
@@ -500,6 +521,14 @@ export function setupPlayerSocket(ws: WebSocket) {
         }
       }
       broadcastChatMessage(chatPayload);
+    } else if (type === "deleteChat") {
+      if (!session) return;
+      const messageId = typeof data.id === "string" ? data.id : "";
+      if (!messageId) return;
+      const record = recentChatMessages.find((item) => item.id === messageId);
+      if (!record) return;
+      if (record.kthId !== session.kthId) return;
+      removeChatMessage(messageId);
     }
   });
 }

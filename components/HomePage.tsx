@@ -89,7 +89,8 @@ const HomePage: FC<HomePageProps> = ({
         <div class="player-meta">
           <span>
             Inloggad som <strong>{userDisplayName}</strong>
-          </span>
+            <img src="/media/dog.gif" height="20px" alt="" class="dog" />
+          </span> 
         </div>
       </header>
       <div class="home-columns">
