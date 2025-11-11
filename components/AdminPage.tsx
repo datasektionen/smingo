@@ -25,6 +25,13 @@ const AdminPage: FC = () => (
               <option value="updated">Recently updated</option>
             </select>
           </label>
+          <label class="admin-field">
+            <span class="admin-label">Card Set</span>
+            <select id="cardSetToggle" class="admin-input">
+              <option value="VM">VM (Valmöte)</option>
+              <option value="SM">SM (Sektionsmöte)</option>
+            </select>
+          </label>
         </div>
       </section>
       <div class="admin-content">

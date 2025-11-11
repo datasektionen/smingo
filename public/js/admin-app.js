@@ -5,6 +5,7 @@
     const detailEl = document.getElementById("adminDetail");
     const searchInput = document.getElementById("adminSearch");
     const sortSelect = document.getElementById("adminSort");
+    const cardSetToggle = document.getElementById("cardSetToggle");
     const socketUrl =
       (window.location.protocol === "https:" ? "wss://" : "ws://") +
       window.location.host + "/ws?role=admin";
@@ -509,6 +510,50 @@
         applyFilters();
       });
     }
+
+    // Card set toggle functionality
+    async function loadCardSet() {
+      try {
+        const response = await fetch('/api/cardset');
+        if (response.ok) {
+          const data = await response.json();
+          if (cardSetToggle) {
+            cardSetToggle.value = data.cardSet;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load card set:', error);
+      }
+    }
+
+    async function saveCardSet(cardSet) {
+      try {
+        const response = await fetch('/api/cardset', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ cardSet }),
+        });
+        if (response.ok) {
+          console.log(`Card set changed to: ${cardSet}`);
+        } else {
+          console.error('Failed to save card set');
+        }
+      } catch (error) {
+        console.error('Failed to save card set:', error);
+      }
+    }
+
+    if (cardSetToggle) {
+      cardSetToggle.addEventListener("change", () => {
+        const newCardSet = cardSetToggle.value;
+        saveCardSet(newCardSet);
+      });
+    }
+
+    // Load initial card set
+    loadCardSet();
 
     connect();
 

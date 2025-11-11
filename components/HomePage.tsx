@@ -72,6 +72,49 @@ const HomePage: FC<HomePageProps> = ({
       }
     })();
   `.replace(/</g, "\u003c");
+
+  const toggleScript = `
+    (() => {
+      const STORAGE_KEY_UI = 'smingo_hide_ui';
+      
+      const chatPanel = document.querySelector('.chat-panel');
+      const highlightBanner = document.getElementById('highlightBanner');
+      const toggleBtn = document.getElementById('toggleUI');
+      
+      // Load saved preference
+      const uiHidden = localStorage.getItem(STORAGE_KEY_UI) === 'true';
+      
+      function updateUIVisibility(hidden) {
+        if (chatPanel) {
+          chatPanel.style.display = hidden ? 'none' : '';
+          chatPanel.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+        }
+        if (highlightBanner) {
+          highlightBanner.style.display = hidden ? 'none' : '';
+          highlightBanner.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+        }
+        if (toggleBtn) {
+          toggleBtn.classList.toggle('ui-toggle-button--hidden', hidden);
+          toggleBtn.title = hidden ? 'Show chat and banner' : 'Hide chat and banner';
+          toggleBtn.textContent = hidden ? '💬' : '✖️';
+        }
+
+        localStorage.setItem(STORAGE_KEY_UI, hidden.toString());
+      }
+      
+      // Set initial state
+      updateUIVisibility(uiHidden);
+      
+      // Add event listener
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+          const isCurrentlyHidden = chatPanel && chatPanel.style.display === 'none';
+          updateUIVisibility(!isCurrentlyHidden);
+        });
+      }
+    })();
+  `.replace(/</g, "\u003c");
+
   const boardNavItems: readonly BoardNavbarItem[] = [
     { id: "bingo", label: "Bräde" },
     { id: "toplist", label: "Topplista" },
@@ -95,6 +138,15 @@ const HomePage: FC<HomePageProps> = ({
       </header>
       <div class="home-columns">
         <ChatPanel userId={userDisplayName} />
+        <button 
+          id="toggleUI" 
+          type="button" 
+          class="ui-toggle-button" 
+          title="Toggle chat and banner"
+          aria-label="Toggle chat panel and banner"
+        >
+          ✖️
+        </button>
         <section
           id="boardSection"
           class="board-section"
@@ -117,6 +169,10 @@ const HomePage: FC<HomePageProps> = ({
       <script
         type="module"
         dangerouslySetInnerHTML={{ __html: boardNavScript }}
+      ></script>
+      <script
+        type="module"
+        dangerouslySetInnerHTML={{ __html: toggleScript }}
       ></script>
       <script type="module" src="/assets/chat-app.js"></script>
     </div>
