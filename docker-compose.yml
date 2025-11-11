@@ -7,4 +7,21 @@ services:
       - "8080:8080"
     env_file:
       - .env
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_USER: smingo
+      DATABASE_PASSWORD: smingopass
+      DATABASE_NAME: smingo
+    depends_on:
+      - postgres
     restart: unless-stopped
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: smingo
+      POSTGRES_PASSWORD: smingopass
+      POSTGRES_DB: smingo
+    ports:
+      - "5432:5432"
