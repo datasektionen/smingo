@@ -17,6 +17,7 @@ const smExclusive = [
   `Någon jämkar sig`,
   `SM börjar minst 15 min sent`,
   `"SMingo!"`,
+  `Kandidat/motionär presenterar i max 20 sekunder`,
   `SM tar mer än 2 timmar`,
   `SM tar mer än 4 timmar`,
   `Styrelsen har smugit in en oseriös att-sats`,

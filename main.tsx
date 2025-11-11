@@ -9,7 +9,8 @@ import Layout from "./components/Layout.tsx";
 import HomePage from "./components/HomePage.tsx";
 import AdminPage from "./components/AdminPage.tsx";
 import TalmanPage from "./components/TalmanPage.tsx";
-import cards from "./cards-SM.ts";
+import cardsVM from "./cards-VM.ts";
+import cardsSM from "./cards-SM.ts";
 import { setupAdminSocket, setupPlayerSocket } from "./server/chat.ts";
 import { handleUploadRequest } from "./server/upload.ts";
 import { cookieSecret, DEV_MODE, loginRedirectUrl } from "./server/config.ts";
@@ -20,6 +21,9 @@ import {
   verifyLegacyLogin,
 } from "./server/auth.ts";
 import { createSeededRandom } from "./server/random.ts";
+
+// Global configuration state
+let currentCardSet: "VM" | "SM" = "SM"; // Default to SM
 
 const smingoCss = Deno.readTextFileSync(
   new URL("./public/smingo.css", import.meta.url),
@@ -43,6 +47,25 @@ app.post("/api/upload", async (c: Context) => {
   const session = await ensurePlayerSession(c);
   if (session instanceof Response) return session;
   return handleUploadRequest(c);
+});
+
+// API endpoints for card set management
+app.get("/api/cardset", async (c: Context) => {
+  const session = await ensureAdminSession(c);
+  if (session instanceof Response) return session;
+  return c.json({ cardSet: currentCardSet });
+});
+
+app.post("/api/cardset", async (c: Context) => {
+  const session = await ensureAdminSession(c);
+  if (session instanceof Response) return session;
+  
+  const body = await c.req.json();
+  if (body.cardSet === "SM" || body.cardSet === "VM") {
+    currentCardSet = body.cardSet;
+    return c.json({ success: true, cardSet: currentCardSet });
+  }
+  return c.json({ success: false, error: "Invalid card set" }, 400);
 });
 
 app.get("/assets/smingo.css", () =>
@@ -124,6 +147,7 @@ app.get("/callback/:code", async (c: Context) => {
 });
 
 app.get("/", async (c: Context) => {
+  const cards = currentCardSet === "SM" ? cardsSM : cardsVM;
   const things = cards.toSorted();
 
   const session = await ensurePlayerSession(c);

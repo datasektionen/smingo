@@ -57,6 +57,70 @@ body {
   margin-bottom: 4px;
 }
 
+.player-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ui-toggle-button {
+  position: fixed;
+  top: 20px;
+  left: 340px;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #ddd;
+  border-radius: 50%;
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.ui-toggle-button:hover {
+  background: rgba(240, 240, 240, 0.95);
+  border-color: #bbb;
+  transform: scale(1.05);
+}
+
+.ui-toggle-button--hidden {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  background: rgba(0, 122, 204, 0.95);
+  border-color: #007acc;
+  color: white;
+}
+
+.ui-toggle-button--hidden:hover {
+  background: rgba(0, 90, 153, 0.95);
+  border-color: #005a99;
+}
+
+@media (max-width: 960px) {
+  .ui-toggle-button {
+    left: 16px;
+    top: 16px;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+  
+  .ui-toggle-button--hidden {
+    top: 16px;
+    left: 16px;
+    width: 32px;
+    height: 32px;
+  }
+}
+
 .highlight-banner {
   position: relative;
   width: 100%;
