@@ -7,7 +7,7 @@ const smExclusive = [
   `"Ju förr desto bättre"`,
   `En motion/propp ingen förstår`,
   `En motion/propp är klar på under 3 minuter`,
-  `En motion/propp tar mer än 45 minuter`,
+  `En beslutspunkt tar mer än 45 minuter`,
   `"Hej SM!"`,
   `Ingen vet vilket ändringsyrkande som gäller`,
   `Justerarna lämnar innan mötets slut`,
