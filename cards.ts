@@ -47,6 +47,7 @@ const commonCards = [
   `Talman suckar högljutt åt någons förslag`,
   `Ordningsfråga`,
   `Någon däremot? "Nej"`,
+  `"SMingo!" (minst 50% måste höra det)`,
 ];
 
 export default commonCards;
