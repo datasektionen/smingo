@@ -5,10 +5,8 @@ const storageInitializationScript = `(() => {
   try {
     const today = new Date().toISOString().split("T")[0];
     const stored = localStorage.getItem(DATE_KEY);
-    if (stored && stored !== today) {
+    if (stored !== today) {
       localStorage.clear();
-    }
-    if (!stored || stored !== today) {
       localStorage.setItem(DATE_KEY, today);
     }
   } catch (error) {
