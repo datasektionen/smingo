@@ -13,13 +13,15 @@ import cardsVM from "./cards-VM.ts";
 import cardsSM from "./cards-SM.ts";
 import { setupAdminSocket, setupPlayerSocket } from "./server/chat.ts";
 import { handleUploadRequest } from "./server/upload.ts";
-import { cookieSecret, DEV_MODE, loginRedirectUrl } from "./server/config.ts";
+import { cookieSecret, DEV_MODE } from "./server/config.ts";
 import {
   ensureAdminSession,
   ensurePlayerSession,
+  getSessionKthId,
   resolveUserProfile,
-  verifyLegacyLogin,
+  verifyOidcLogin,
 } from "./server/auth.ts";
+import { fetchAvatarUrl } from "./server/avatars.ts";
 import { createSeededRandom } from "./server/random.ts";
 
 // Global configuration state
@@ -47,6 +49,21 @@ app.post("/api/upload", async (c: Context) => {
   const session = await ensurePlayerSession(c);
   if (session instanceof Response) return session;
   return handleUploadRequest(c);
+});
+
+app.get("/api/avatar/:kthid", async (c: Context) => {
+  const sessionKthId = await getSessionKthId(c);
+  if (!sessionKthId) {
+    return c.json({ url: "" }, 401);
+  }
+  const kthid = c.req.param("kthid");
+  const url = await fetchAvatarUrl(kthid, false);
+  if (!url) {
+    return c.json({ url: "" }, 404);
+  }
+  return c.json({ url }, 200, {
+    "cache-control": "no-store",
+  });
 });
 
 // API endpoints for card set management
@@ -136,9 +153,10 @@ app.get("/media/:filename", async (c: Context) => {
   }
 });
 
-app.get("/callback/:code", async (c: Context) => {
-  const code = c.req.param("code");
-  const result = await verifyLegacyLogin(code);
+app.get("/auth/callback", async (c: Context) => {
+  const code = c.req.query("code");
+  const state = c.req.query("state");
+  const result = await verifyOidcLogin(c, code, state);
   if (!result.success) {
     return c.text(result.message, 401);
   }

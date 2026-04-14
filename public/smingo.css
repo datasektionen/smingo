@@ -175,23 +175,12 @@ h1 {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   gap: 12px;
 }
 
-@media (max-width: 960px) {
-  .home-columns {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .board-column {
-    max-height: none;
-    overflow: visible;
-  }
-  .chat-panel {
-    max-height: none;
-  }
-}
 
 .player-meta {
   font-size: 12px;
@@ -214,9 +203,9 @@ main.board-grid {
   grid-template-rows: repeat(5, minmax(0, 1fr));
   gap: clamp(6px, 1.6vw, 12px);
   min-height: 0;
+  min-width: 700px;
   height: 100%;
   width: 100%;
-  max-width: 100%;
 }
 
 .board-section [data-board-view] {
@@ -249,7 +238,7 @@ main.board-grid {
   flex: 1;
   min-height: 0;
   max-height: 100%;
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
   padding: 0 2px 4px;
 }
@@ -606,13 +595,6 @@ main.board-grid {
   overflow: visible;
 }
 
-@media (max-width: 960px) {
-  .chat-panel {
-    flex: none;
-    max-width: none;
-    width: 100%;
-  }
-}
 
 .chat-header h2 {
   font-size: 22px;
@@ -1416,4 +1398,148 @@ main.admin-page {
   color: #fff;
   border-color: seagreen;
   box-shadow: 0 4px 14px rgba(46, 139, 87, 0.35);
+}
+
+/* ── Mobile bottom navigation ── */
+.mobile-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 900;
+    background: rgba(255, 255, 255, 0.97);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+    gap: 4px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+  }
+
+  .mobile-nav__button {
+    flex: 1;
+    padding: 10px 4px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    box-shadow: none;
+  }
+
+  .mobile-nav__button:active {
+    transform: none;
+  }
+
+  .mobile-nav__button--active {
+    background: rgba(33, 150, 243, 0.15);
+    color: #1565c0;
+  }
+
+  /* Page shell: no bottom padding gap, leave room for nav */
+  .page-shell {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    gap: 8px;
+  }
+
+  /* Header compact on mobile */
+  .home-header {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  .player-meta {
+    font-size: 11px;
+  }
+
+  /* Hide desktop toggle button on mobile */
+  .ui-toggle-button {
+    display: none;
+  }
+
+  /* Hide desktop board navbar on mobile (replaced by bottom nav) */
+  .board-navbar {
+    display: none;
+  }
+
+  /* Layout: show one view at a time */
+  .home-columns {
+    flex-direction: column;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .home-columns .chat-panel {
+    display: none;
+    flex: 1;
+    max-width: none;
+    max-height: none;
+    border-radius: 12px;
+    padding: 12px 8px 0;
+    border: none;
+    box-shadow: none;
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  .home-columns[data-mobile-view="chat"] .chat-panel {
+    display: flex;
+  }
+
+  .home-columns .board-section {
+    display: none;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .home-columns[data-mobile-view="board"] .board-section,
+  .home-columns[data-mobile-view="toplist"] .board-section {
+    display: flex;
+  }
+
+  /* Highlight banner: only show in board view */
+  .home-columns:not([data-mobile-view="board"]) .highlight-banner {
+    display: none;
+  }
+
+  /* Board: horizontally scrollable with readable cell sizes */
+  .home-columns .board-section {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .board-grid .cell {
+    padding: 8px 6px;
+    font-size: 13px;
+    border-radius: 8px;
+    min-height: 56px;
+  }
+
+  /* Chat: full height */
+  .chat-messages {
+    padding-right: 4px;
+  }
+
+  .chat-header h2 {
+    font-size: 18px;
+  }
+
+  /* Toplist on mobile */
+  .board-toplist {
+    border-radius: 12px;
+  }
+
+  .board-toplist__cell {
+    padding: 4px;
+    font-size: 10px;
+  }
 }

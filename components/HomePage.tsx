@@ -120,6 +120,41 @@ const HomePage: FC<HomePageProps> = ({
     { id: "toplist", label: "Topplista" },
   ];
 
+  const mobileNavScript = `
+    (() => {
+      const nav = document.getElementById('mobileNav');
+      const columns = document.querySelector('.home-columns');
+      if (!nav || !columns) return;
+
+      const boardSection = document.getElementById('boardSection');
+      const buttons = Array.from(nav.querySelectorAll('button[data-mobile-view]'));
+
+      function setMobileView(view) {
+        columns.setAttribute('data-mobile-view', view);
+        buttons.forEach(btn => {
+          btn.classList.toggle('mobile-nav__button--active', btn.dataset.mobileView === view);
+        });
+        if (boardSection) {
+          if (view === 'toplist') {
+            boardSection.setAttribute('data-view', 'toplist');
+            boardSection.querySelector('.board-navbar__button[data-view="toplist"]')?.click();
+          } else if (view === 'board') {
+            boardSection.setAttribute('data-view', 'bingo');
+            boardSection.querySelector('.board-navbar__button[data-view="bingo"]')?.click();
+          }
+        }
+      }
+
+      nav.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-mobile-view]');
+        if (!btn) return;
+        setMobileView(btn.dataset.mobileView);
+      });
+
+      setMobileView('board');
+    })();
+  `.replace(/</g, "\\u003c");
+
   return (
     <div class="home-content">
       <div
@@ -133,15 +168,15 @@ const HomePage: FC<HomePageProps> = ({
           <span>
             Inloggad som <strong>{userDisplayName}</strong>
             <img src="/media/dog.gif" height="20px" alt="" class="dog" />
-          </span> 
+          </span>
         </div>
       </header>
-      <div class="home-columns">
+      <div class="home-columns" data-mobile-view="board">
         <ChatPanel userId={userDisplayName} />
-        <button 
-          id="toggleUI" 
-          type="button" 
-          class="ui-toggle-button" 
+        <button
+          id="toggleUI"
+          type="button"
+          class="ui-toggle-button"
           title="Toggle chat and banner"
           aria-label="Toggle chat panel and banner"
         >
@@ -161,6 +196,11 @@ const HomePage: FC<HomePageProps> = ({
           <TopListBoard />
         </section>
       </div>
+      <nav id="mobileNav" class="mobile-nav" aria-label="Mobile navigation">
+        <button type="button" class="mobile-nav__button mobile-nav__button--active" data-mobile-view="board">Bräde</button>
+        <button type="button" class="mobile-nav__button" data-mobile-view="toplist">Topplista</button>
+        <button type="button" class="mobile-nav__button" data-mobile-view="chat">Chatt</button>
+      </nav>
       <script
         id="smingoConfig"
         type="application/json"
@@ -173,6 +213,10 @@ const HomePage: FC<HomePageProps> = ({
       <script
         type="module"
         dangerouslySetInnerHTML={{ __html: toggleScript }}
+      ></script>
+      <script
+        type="module"
+        dangerouslySetInnerHTML={{ __html: mobileNavScript }}
       ></script>
       <script type="module" src="/assets/chat-app.js"></script>
     </div>

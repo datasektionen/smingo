@@ -17,6 +17,8 @@ const storageInitializationScript = `(() => {
 const Layout: FC = (props) => (
   <html>
     <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+      <title>SMingo</title>
       <script
         dangerouslySetInnerHTML={{ __html: storageInitializationScript }}
       ></script>

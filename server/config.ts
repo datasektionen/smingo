@@ -6,17 +6,40 @@ export const websiteUrl = Deno.env.get("WEBSITE_URL") ?? "http://localhost:8080"
 export const cookieSecret =
   Deno.env.get("COOKIE_SECRET") ?? (DEV_MODE ? "dev-secret" : undefined);
 
-export const loginApiKey =
-  Deno.env.get("LOGIN_API_KEY") ?? (DEV_MODE ? "dev-api-key" : undefined);
+export const ssoIssuerUrl =
+  Deno.env.get("SSO_ISSUER_URL") ?? "https://sso.datasektionen.se/op";
 
-if (!DEV_MODE && (!cookieSecret || !loginApiKey)) {
-  console.error("COOKIE_SECRET or LOGIN_API_KEY missing in environment");
+export const ssoClientId =
+  Deno.env.get("SSO_CLIENT_ID") ?? (DEV_MODE ? "dev-client-id" : undefined);
+
+export const ssoClientSecret =
+  Deno.env.get("SSO_CLIENT_SECRET") ??
+    (DEV_MODE ? "dev-client-secret" : undefined);
+
+export const ssoScopes = (Deno.env.get("SSO_SCOPES") ??
+  "openid profile email").split(/\s+/).filter(Boolean);
+
+export const ssoRedirectUrl = new URL("/auth/callback", websiteUrl).toString();
+
+if (!DEV_MODE && (!cookieSecret || !ssoClientId || !ssoClientSecret)) {
+  console.error(
+    "COOKIE_SECRET, SSO_CLIENT_ID, or SSO_CLIENT_SECRET missing in environment",
+  );
   Deno.exit(1);
 }
 
-export const loginRedirectUrl =
-  "https://sso.datasektionen.se/legacyapi/login?callback=" +
-  encodeURIComponent(websiteUrl + "/callback/");
+export const rfingerApiKey =
+  Deno.env.get("RFINGER_API_KEY") ?? (DEV_MODE ? "dev-rfinger-key" : undefined);
+
+export const rfingerApiBaseUrl =
+  Deno.env.get("RFINGER_API_BASE_URL") ?? "https://rfinger.datasektionen.se/api";
+
+if (!DEV_MODE && !rfingerApiKey) {
+  console.warn("RFINGER_API_KEY not configured; avatars will be unavailable.");
+}
+
+export const ssoUserApiUrl =
+  Deno.env.get("SSO_USER_API_URL") ?? "http://sso.nomad.dsekt.internal";
 
 const adminKthidList =
   Deno.env.get("ADMIN_KTHIDS") ?? (DEV_MODE ? "devuser" : "");

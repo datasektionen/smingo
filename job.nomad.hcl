@@ -29,7 +29,9 @@ job "smingo" {
         data        = <<ENV
 {{ with nomadVar "nomad/jobs/smingo" }}
 COOKIE_SECRET={{ .cookie_secret }}
-LOGIN_API_KEY={{ .login_api_key }}
+SSO_CLIENT_ID={{ .sso_client_id }}
+SSO_CLIENT_SECRET={{ .sso_client_secret }}
+RFINGER_API_KEY={{ .rfinger_api_key }}
 {{ end }}
 PORT={{ env "NOMAD_PORT_http" }}
 WEBSITE_URL=https://smingo.datasektionen.se

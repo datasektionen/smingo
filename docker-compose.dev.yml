@@ -1,0 +1,42 @@
+services:
+  # Run smingo in Docker (optional — for host dev just run `deno task start`)
+  smingo:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      # Override for docker-compose networking (dock container, not localhost)
+      RFINGER_API_BASE_URL: http://dock:9003/api
+    depends_on:
+      - dock
+    restart: unless-stopped
+
+  # rfinger mock via dock — provides avatar URLs for dev
+  dock:
+    image: ghcr.io/datasektionen/dock:latest
+    configs:
+      - source: dock.yaml
+        target: /config.yaml
+    ports:
+      - "9003:9003"
+
+configs:
+  dock.yaml:
+    content: |
+      rfinger:
+        default: http://localhost:9003
+        pictures:
+          turetek:
+            regular: https://thskth.se/wp-content/uploads/2023/06/ths-logo-bla-01-300x294-1.png
+            small: https://thskth.se/wp-content/uploads/2019/12/ths-logo-svart-01.png
+          diadat:
+            regular: https://dsekt-assets.s3.amazonaws.com/logotyp
+            small: https://dsekt-assets.s3.amazonaws.com/logotyp
+          marmed:
+            regular: https://storage.googleapis.com/medieteknik-static/static/logos/logo.webp
+            small: https://storage.googleapis.com/medieteknik-static/static/logos/logo.webp
+          devuser:
+            regular: https://storage.googleapis.com/medieteknik-static/static/logos/logo.webp
+            small: https://storage.googleapis.com/medieteknik-static/static/logos/logo.webp

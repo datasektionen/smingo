@@ -1015,6 +1015,77 @@
       ensureHighlightLoop();
     }
 
+    const avatarUrlCache = new Map();
+    const AVATAR_URL_TTL = 10 * 60 * 1000;
+
+    function fetchAvatarUrl(kthId) {
+      if (typeof kthId !== "string" || !kthId) {
+        return Promise.resolve("");
+      }
+      const cached = avatarUrlCache.get(kthId);
+      const now = Date.now();
+      if (cached) {
+        if (cached.url && cached.expiresAt > now) {
+          return Promise.resolve(cached.url);
+        }
+        if (cached.inFlight) {
+          return cached.inFlight;
+        }
+      }
+      const request = fetch(
+        "/api/avatar/" + encodeURIComponent(kthId),
+        {
+          headers: { "accept": "application/json" },
+        },
+      )
+        .then((response) => {
+          if (!response.ok) return null;
+          const contentType = response.headers.get("content-type") || "";
+          if (!contentType.includes("application/json")) return null;
+          return response.json();
+        })
+        .then((data) => {
+          const url = data && typeof data.url === "string" ? data.url.trim() : "";
+          if (url) {
+            avatarUrlCache.set(kthId, {
+              url,
+              expiresAt: Date.now() + AVATAR_URL_TTL,
+              inFlight: null,
+            });
+            return url;
+          }
+          avatarUrlCache.delete(kthId);
+          return "";
+        })
+        .catch(() => {
+          avatarUrlCache.delete(kthId);
+          return "";
+        });
+
+      avatarUrlCache.set(kthId, { url: "", expiresAt: 0, inFlight: request });
+      return request;
+    }
+
+    function applyAvatarFallback(avatar, entry) {
+      if (!avatar || !entry) return;
+      avatar.classList.remove("chat-message__avatar--image");
+      avatar.textContent = buildAvatarLabel(entry.userId);
+      delete avatar.dataset.kthId;
+      entry.kthId = "";
+      chatUserDirectory.delete(entry.userId);
+      const img = avatar.querySelector("img");
+      if (img) img.remove();
+    }
+
+    function clearAvatarLabel(avatar) {
+      if (!avatar) return;
+      for (const node of Array.from(avatar.childNodes)) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          node.remove();
+        }
+      }
+    }
+
     function buildAvatarLabel(name) {
       if (typeof name !== "string") return "?";
       const trimmed = name.trim();
@@ -1043,7 +1114,7 @@
       avatar.className = "chat-message__avatar";
       const kthId = typeof entry.kthId === "string" ? entry.kthId : "";
       if (kthId) {
-        avatar.textContent = "";
+        avatar.textContent = buildAvatarLabel(entry.userId);
         avatar.setAttribute("title", kthId);
         const img = document.createElement("img");
         img.className = "chat-message__avatarImage";
@@ -1051,20 +1122,20 @@
         img.loading = "lazy";
         img.decoding = "async";
         img.referrerPolicy = "no-referrer";
-        img.src = "https://zfinger.datasektionen.se/user/" +
-          encodeURIComponent(kthId) +
-          "/image/100";
         img.addEventListener("error", () => {
-          img.remove();
-          avatar.classList.remove("chat-message__avatar--image");
-          avatar.textContent = buildAvatarLabel(entry.userId);
-          delete avatar.dataset.kthId;
-          entry.kthId = "";
-          chatUserDirectory.delete(entry.userId);
+          applyAvatarFallback(avatar, entry);
         });
         avatar.appendChild(img);
-        avatar.classList.add("chat-message__avatar--image");
-        avatar.dataset.kthId = kthId;
+        fetchAvatarUrl(kthId).then((url) => {
+          if (!url) {
+            applyAvatarFallback(avatar, entry);
+            return;
+          }
+          clearAvatarLabel(avatar);
+          avatar.classList.add("chat-message__avatar--image");
+          avatar.dataset.kthId = kthId;
+          img.src = url;
+        });
       } else {
         avatar.textContent = buildAvatarLabel(entry.userId);
         delete avatar.dataset.kthId;
