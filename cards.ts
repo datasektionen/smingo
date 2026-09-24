@@ -2,7 +2,7 @@ const commonCards = [
   `Ändring i föredragningslistan`,
   `Det sker en sakupplysning`,
   `"Det var bättre förr"`,
-  `Diskussion på samma punkt över en timme`,
+  `Diskussion på samma punkt tar mer än en timme`,
   `Diskussion som "fråga"`,
   `Fler än 5 personer vinner Betting`,
   `Ingen revisor är på plats`,
@@ -15,9 +15,10 @@ const commonCards = [
   `Någon hoppar/klättrar över en bänkrad`,
   `Någon i styrelsen tar av sig hatten`,
   `Någon klagar på betting inte öppnats`,
-  `Någon visar brain-rott på stora skärmen`,
+  `Någon visar brain-rot på stora skärmen`,
   `Någon öppnar dörren när den ska vara stängd`,
   `Någon säger något halv-kul (minst 20% behöver skratta)`,
+  `Någon säger något kul (minst 50% behöver skratta)`,
   `Någon säger något jättekul (minst 80% behöver skratta)`,
   `Någons telefon låter`,
   `Någon tar mer än 10 sekunder på sig för att få mikrofonen att funka`,
@@ -29,7 +30,7 @@ const commonCards = [
   `Sekreterare frågar om någons namn`,
   `Skämt om medias ekonomi`,
   `"Sluta stäng av mikrofonen"`,
-  `Sträck i debatten`,
+  `Streck i debatten`,
   `Talarlistan används`,
   `Talman avbryter någon mitt i meningen`,
   `Talman talar fel`,
@@ -47,6 +48,7 @@ const commonCards = [
   `Talman suckar högljutt åt någons förslag`,
   `Ordningsfråga`,
   `Någon däremot? "Nej"`,
+  `Elliot gör ett ändringsyrkande.`
 ];
 
 export default commonCards;
