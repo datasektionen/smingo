@@ -6,7 +6,7 @@ import {
 } from "./attachments.ts";
 import { websiteUrl } from "./config.ts";
 
-// Uploads are stored on local disk (ephemeral, like the chat history).
+// Local fallback uploads are stored on disk (ephemeral, like the chat history).
 // When the total size exceeds the budget, the oldest files are evicted.
 const UPLOAD_DIR = await Deno.makeTempDir({ prefix: "smingo-uploads-" });
 const UPLOAD_TOTAL_BUDGET_BYTES = 200 * 1024 * 1024;
@@ -30,6 +30,49 @@ const CONTENT_TYPES: Record<string, string> = {
   m4v: "video/x-m4v",
   ogv: "video/ogg",
 };
+// Images in these formats go to freeimage.host (Chevereto API, same as the old
+// imgbb integration). Videos, other formats, and failed uploads fall back to
+// local storage.
+const FREEIMAGE_ENDPOINT = "https://freeimage.host/api/1/upload";
+const FREEIMAGE_API_KEY = Deno.env.get("FREEIMAGE_API_KEY") ??
+  "6d207e02198a847aa98d0a2a901485a5";
+const FREEIMAGE_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "gif",
+  "webp",
+  "bmp",
+]);
+
+async function uploadToFreeimage(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("key", FREEIMAGE_API_KEY);
+  form.append("action", "upload");
+  form.append("format", "json");
+  form.append("source", file, file.name || "upload");
+  try {
+    const response = await fetch(FREEIMAGE_ENDPOINT, {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(20_000),
+    });
+    const payload = await response.json();
+    const url = payload?.image?.url;
+    if (response.ok && typeof url === "string" && url.startsWith("https://")) {
+      return url;
+    }
+    console.error(
+      "freeimage.host rejected upload",
+      response.status,
+      payload?.error?.message ?? payload,
+    );
+  } catch (error) {
+    console.error("freeimage.host upload failed", error);
+  }
+  return "";
+}
+
 const MIME_TO_EXTENSION: Record<string, string> = {};
 for (const [ext, mime] of Object.entries(CONTENT_TYPES)) {
   MIME_TO_EXTENSION[mime] ??= ext;
@@ -74,8 +117,7 @@ export async function handleUploadRequest(c: Context): Promise<Response> {
     return null;
   };
 
-  const fileEntry =
-    pickFile(form.get("attachment")) ??
+  const fileEntry = pickFile(form.get("attachment")) ??
     pickFile(form.get("file")) ??
     pickFile(form.get("source"));
 
@@ -90,11 +132,13 @@ export async function handleUploadRequest(c: Context): Promise<Response> {
   if (fileEntry.size > ATTACHMENT_MAX_SIZE_BYTES) {
     return c.json(
       {
-        error: `Attachment is too large. Max ${Math.round(
-          ATTACHMENT_MAX_SIZE_BYTES / (1024 * 1024)
-        )} MB.`,
+        error: `Attachment is too large. Max ${
+          Math.round(
+            ATTACHMENT_MAX_SIZE_BYTES / (1024 * 1024),
+          )
+        } MB.`,
       },
-      413
+      413,
     );
   }
 
@@ -107,21 +151,29 @@ export async function handleUploadRequest(c: Context): Promise<Response> {
     return c.json({ error: "Only images or videos are allowed." }, 415);
   }
 
-  const filename = `${crypto.randomUUID()}.${extension}`;
-  try {
-    await Deno.writeFile(`${UPLOAD_DIR}/${filename}`, fileEntry.stream());
-  } catch (error) {
-    console.error("Failed to store upload", error);
-    return c.json({ error: "Failed to store the attachment." }, 500);
+  const isVideo = CONTENT_TYPES[extension].startsWith("video/");
+  let url = FREEIMAGE_EXTENSIONS.has(extension)
+    ? await uploadToFreeimage(fileEntry)
+    : "";
+
+  if (!url) {
+    const filename = `${crypto.randomUUID()}.${extension}`;
+    try {
+      await Deno.writeFile(`${UPLOAD_DIR}/${filename}`, fileEntry.stream());
+    } catch (error) {
+      console.error("Failed to store upload", error);
+      return c.json({ error: "Failed to store the attachment." }, 500);
+    }
+    storedUploads.push({ filename, size: fileEntry.size });
+    storedBytes += fileEntry.size;
+    await evictOldUploads();
+    url = new URL(`/uploads/${filename}`, websiteUrl).toString();
   }
-  storedUploads.push({ filename, size: fileEntry.size });
-  storedBytes += fileEntry.size;
-  await evictOldUploads();
 
   const sanitized = sanitizeAttachmentInput(
-    new URL(`/uploads/${filename}`, websiteUrl).toString(),
-    CONTENT_TYPES[extension].startsWith("video/") ? "video" : "image",
-    fileEntry.name
+    url,
+    isVideo ? "video" : "image",
+    fileEntry.name,
   );
   if (!sanitized) {
     return c.json({ error: "Failed to store the attachment." }, 500);
@@ -130,14 +182,13 @@ export async function handleUploadRequest(c: Context): Promise<Response> {
   return c.json({
     url: sanitized.url,
     type: sanitized.type,
-    name:
-      sanitized.name ||
+    name: sanitized.name ||
       (typeof fileEntry.name === "string" ? fileEntry.name : ""),
   });
 }
 
 export async function handleUploadedFileRequest(
-  c: Context
+  c: Context,
 ): Promise<Response> {
   const filename = c.req.param("filename") ?? "";
   const match = /^[0-9a-f-]{36}\.([a-z0-9]+)$/.exec(filename);
