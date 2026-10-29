@@ -1,3 +1,5 @@
+import { websiteUrl } from "./config.ts";
+
 export type AttachmentType = "image" | "video";
 
 export interface SanitizedAttachment {
@@ -30,9 +32,7 @@ export const ATTACHMENT_VIDEO_EXTENSIONS = new Set([
   "mkv",
   "gifv",
 ]);
-export const ATTACHMENT_MAX_SIZE_BYTES = 25 * 1024 * 1024;
-export const IMAGE_UPLOAD_ENDPOINT = "https://api.imgbb.com/1/upload";
-export const IMAGE_UPLOAD_KEY = "b70958c5e3ef5bebb4d300c8d8b2ae25";
+export const ATTACHMENT_MAX_SIZE_BYTES = 20 * 1024 * 1024;
 
 export function getFileExtension(path: string): string {
   const lastDot = path.lastIndexOf(".");
@@ -58,7 +58,12 @@ export function sanitizeAttachmentInput(
     return null;
   }
 
-  if (parsed.protocol !== "https:") return null;
+  if (
+    parsed.protocol !== "https:" &&
+    parsed.origin !== new URL(websiteUrl).origin
+  ) {
+    return null;
+  }
 
   const cleanUrl = parsed.toString();
   let type: AttachmentType;
@@ -86,55 +91,4 @@ export function sanitizeAttachmentInput(
   }
 
   return { url: cleanUrl, type, name };
-}
-
-export function extractUploadUrl(payload: unknown): string {
-  if (!payload || typeof payload !== "object" || payload === null) {
-    return "";
-  }
-  const record = payload as Record<string, unknown>;
-  const directCandidates = [record.url, record.display_url, record.url_viewer];
-  for (const candidate of directCandidates) {
-    if (typeof candidate === "string" && candidate.startsWith("http")) {
-      return candidate;
-    }
-  }
-
-  const nestedKeys = ["image", "data", "upload", "medium", "thumb"];
-  for (const key of nestedKeys) {
-    const nested = record[key];
-    const nestedUrl = extractUploadUrl(nested);
-    if (nestedUrl) return nestedUrl;
-  }
-
-  const images = record.images;
-  if (Array.isArray(images)) {
-    for (const entry of images) {
-      const nestedUrl = extractUploadUrl(entry);
-      if (nestedUrl) return nestedUrl;
-    }
-  }
-
-  return "";
-}
-
-export function extractUploadError(payload: unknown): string {
-  if (!payload || typeof payload !== "object" || payload === null) {
-    return "";
-  }
-  const record = payload as Record<string, unknown>;
-  if (typeof record.error === "string" && record.error) {
-    return record.error;
-  }
-  if (
-    record.error &&
-    typeof record.error === "object" &&
-    record.error !== null
-  ) {
-    const nested = record.error as Record<string, unknown>;
-    if (typeof nested.message === "string" && nested.message) {
-      return nested.message;
-    }
-  }
-  return "";
 }

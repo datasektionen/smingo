@@ -12,7 +12,10 @@ import TalmanPage from "./components/TalmanPage.tsx";
 import cardsVM from "./cards-VM.ts";
 import cardsSM from "./cards-SM.ts";
 import { setupAdminSocket, setupPlayerSocket } from "./server/chat.ts";
-import { handleUploadRequest } from "./server/upload.ts";
+import {
+  handleUploadedFileRequest,
+  handleUploadRequest,
+} from "./server/upload.ts";
 import { cookieSecret, DEV_MODE } from "./server/config.ts";
 import {
   ensureAdminSession,
@@ -50,6 +53,8 @@ app.post("/api/upload", async (c: Context) => {
   if (session instanceof Response) return session;
   return handleUploadRequest(c);
 });
+
+app.get("/uploads/:filename", handleUploadedFileRequest);
 
 app.get("/api/avatar/:kthid", async (c: Context) => {
   const sessionKthId = await getSessionKthId(c);
