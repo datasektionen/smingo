@@ -15,6 +15,12 @@ const ChatPanel: FC<ChatPanelProps> = ({ userId }) => (
     <form id="chatForm" class="chat-form" autocomplete="off">
       <p class="chat-tips">Du kan pinga med @FörnamnEfternamn eller @kthid</p>
       <p id="chatAttachmentInfo" class="chat-attachment-info" aria-live="polite"></p>
+      <p class="chat-attachment-note">
+        Bilder delas publikt via{" "}
+        <a href="https://freeimage.host" target="_blank" rel="noopener noreferrer">
+          freeimage.host
+        </a>
+      </p>
       <div class="chat-input-row">
         <button
           type="button"

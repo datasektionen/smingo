@@ -985,6 +985,37 @@ main.board-grid {
   display: block;
 }
 
+.chat-attachment-note {
+  display: none;
+  margin-bottom: 4px;
+  font-size: 10px;
+  color: #a3a3a3;
+}
+
+.chat-attachment-info[data-visible="1"] + .chat-attachment-note {
+  display: block;
+  animation: chatNoteFadeIn 0.3s ease;
+}
+
+.chat-attachment-note a {
+  color: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.chat-attachment-note a:hover {
+  color: seagreen;
+}
+
+@keyframes chatNoteFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .chat-status {
   margin-top: 4px;
   min-height: 18px;
